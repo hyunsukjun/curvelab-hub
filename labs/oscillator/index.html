@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Oscillator Curve Lab</title>
+    <link rel="icon" type="image/svg+xml" href="assets/identity/oscillator-micro.svg?v=hub-v0.10">
+    <link rel="stylesheet" href="assets/identity/tokens.css?v=hub-v0.10">
+    <link rel="stylesheet" href="src/styles.css?v=20261015-source-tone1">
+    <link rel="stylesheet" href="src/common-transport.css?v=20261013-1">
+    <link rel="stylesheet" href="src/curve-actions.css?v=20261014-family1">
+    <link rel="stylesheet" href="src/file-help.css?v=20261014-family1">
+    <link rel="stylesheet" href="src/parameter-help.css?v=20261014-family1">
+    <link rel="stylesheet" href="src/studio-theme.css?v=20261015-family1">
+    <link rel="stylesheet" href="src/button-states.css?v=20261015-2">
+  <link rel="stylesheet" href="src/value-strip.css?v=20261015-1">
+  <link rel="stylesheet" href="src/functional-surfaces.css?v=20261015-oscillator4">
+    <link rel="stylesheet" href="src/content-alignment.css?v=20261015-1">
+  <link rel="stylesheet" href="src/transport-polish.css?v=20261015-2">
+  <link rel="stylesheet" href="src/transport-surface.css?v=20261015-3">
+  <link rel="stylesheet" href="src/brand-layout.css?v=20261015-1">
+    <link rel="stylesheet" href="src/readout-layout.css?v=20261028-toolbar-context1">
+    <link rel="stylesheet" href="src/header-rhythm.css?v=20261015-2">
+    <link rel="stylesheet" href="src/expanded-editor.css?v=20261015-1">
+    <link rel="stylesheet" href="src/settings-density.css?v=20261015-segments1">
+    <link rel="stylesheet" href="src/typography.css?v=20261015-compact-select1">
+  <link rel="stylesheet" href="src/quiet-ui.css?v=20261023-family1">
+    <link rel="stylesheet" href="src/refined-ui.css?v=20261026-graphite1">
+<link rel="stylesheet" href="../../src/lab-shell.css?v=20261107-shared-tools2"></head>
+  <body>
+    <main class="app">
+      <header class="topbar">
+        <div class="brand">
+          <img class="brandMark" src="assets/identity/oscillator-symbol.svg?v=hub-v0.10" width="48" height="48" alt="" aria-hidden="true">
+          <div class="brandCopy">
+            <h1><span>Oscillator </span><span class="brandAccent">Curve Lab</span></h1>
+            <p class="tagline">Draw base pitch, oscillator spread, and spectral slope across time.</p>
+            <p class="statusLine"><span id="engineStatus">48 kHz target / native preview fallback</span><span class="privacyNote">Local browser synthesis. No upload.</span></p>
+          </div>
+        </div>
+        <div class="transport">
+          <details id="fileHelp" class="fileHelp">
+            <summary aria-label="Audio file and export information" title="Audio file and export information"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="4" r="1" fill="currentColor"/><path d="M6.5 7h1.5v5m-1.5 0h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+            <div class="fileHelpPanel">
+              <strong>Files &amp; export</strong>
+              <dl>
+                <dt>Input</dt><dd>WAV, MP3 recommended.</dd>
+                <dt>AIFF</dt><dd>Mono/stereo 16/24-bit PCM (8–192 kHz), converted locally on import. AIFF-C is not supported.</dd>
+                <dt>File size</dt><dd>Up to 16 MiB.</dd>
+                <dt>Output</dt><dd>1–600 s synthesis, plus file IR tail when used · Stereo 2ch · 48 kHz / 24-bit WAV.</dd>
+              </dl>
+              <p>Resynthesis analyzes up to 30 s from the center of the file. Short excerpts recommended. Use one Lab at a time for heavy processing.</p>
+            </div>
+          </details>
+          <button title="AIFF: mono/stereo 16/24-bit PCM is converted locally on import. AIFF-C is not supported." id="openAudioButton" type="button">Open Audio</button>
+          <input id="impulseInput" type="file" accept="audio/*,.wav,.aif,.aiff,.aifc,.mp3,.m4a,.flac" hidden>
+          <div class="exportStatus" role="status" aria-label="Export status" hidden><strong id="downloadReadout">ready</strong></div>
+          <button id="downloadButton" type="button" title="1–600 s synthesis, plus file IR tail when used · Stereo 2ch · 48 kHz / 24-bit WAV.">Download WAV</button>
+        </div>
+      </header>
+
+      <section class="editor">
+        <div class="sourceBand" title="Choose a synthesis path. File IR processes the oscillator sound.">
+          <div class="soundModes" role="group" aria-label="Sound generation mode">
+            <button id="resynthesisMode" class="active" type="button" aria-pressed="true">File Resynthesis</button>
+            <button id="convolutionButton" type="button" aria-pressed="false">Oscillator + File IR</button>
+          </div>
+
+          <div class="curveActions">
+            <button id="clearCurveButton" type="button">Clear Current</button>
+            <button id="resetButton" type="button">Reset All</button>
+          </div>
+        </div>
+        <div class="controlBand resynthesisActive" id="oscillatorControls">
+          <div class="synthesisGroup">
+          <div class="waveformButtons" role="group" aria-label="Waveform">
+            <span>Waveform</span>
+            <button class="waveformButton active" type="button" aria-pressed="true" data-waveform="sine">Sine</button>
+            <button class="waveformButton" type="button" aria-pressed="false" data-waveform="triangle">Triangle</button>
+            <button class="waveformButton" type="button" aria-pressed="false" data-waveform="saw">Saw</button>
+            <button class="waveformButton" type="button" aria-pressed="false" data-waveform="square">Square</button>
+          </div>
+          <label class="compactField countField">
+            Oscillators
+            <select id="countSelect">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="4" selected>4</option>
+              <option value="8">8</option>
+              <option value="16">16</option>
+            </select>
+          </label>
+          <label class="compactField stackField">
+            Frequency layout
+            <select id="stackSelect">
+              <option value="unison">Unison</option>
+              <option value="harmonic">Harmonic</option>
+              <option value="odd">Odd Harmonics</option>
+              <option value="multiplier">Multiplier</option>
+            </select>
+          </label>
+          </div>
+          <div class="modulationGroup">
+          <label class="compactField modulationField">
+            Modulation
+            <select id="modulationSelect">
+              <option value="off">Off</option>
+              <option value="fm">FM</option>
+              <option value="am">AM</option>
+              <option value="ring">Ring</option>
+            </select>
+          </label>
+          <label id="modulationRatioField" class="compactField ratioField" hidden>
+            Mod Freq ×
+            <input id="modulationRatioInput" type="number" min="0.25" max="8" step="0.25" value="1" inputmode="decimal">
+          </label>
+          </div>
+          <div id="resynthesisControls" class="resynthesisControls">
+            <span id="resynthesisSource" class="impulseStatus" role="status">No sound file loaded</span>
+            <label class="compactField resynthesisCount">Partials
+              <select id="partialCountSelect"><option value="32">32</option><option value="64">64</option></select>
+            </label>
+            <span id="analysisStatus" role="status">Loading default sample…</span>
+          </div>
+        </div>
+
+        <div class="impulseBand">
+          <span id="impulseStatus" class="impulseStatus" role="status" hidden>No IR loaded · dry oscillator</span>
+          <div id="convolutionControls" class="convolutionControls" hidden>
+            <label class="wetControl">Dry/Wet
+              <input id="convolutionWet" type="range" min="0" max="100" value="50">
+              <output id="convolutionWetValue" for="convolutionWet">50%</output>
+            </label>
+            <label class="wetControl">IR Length
+              <input id="impulseLength" type="range" min="0" max="100" value="0">
+              <output id="impulseLengthValue" for="impulseLength">0%</output>
+            </label>
+            <span id="impulseUsedLength" class="impulseUsedLength">3.00 s</span>
+          </div>
+        </div>
+
+        <div id="modulationInfo" class="modulationInfo" hidden aria-live="polite">
+          <span id="modulationFrequencyInfo"></span>
+          <span id="modulationAmountInfo"></span>
+        </div>
+
+        <div class="legend">
+          <div class="modeButtons">
+            <button id="basePitchMode" class="active curveMode" type="button" data-parameter-help aria-describedby="basePitchModeHelp">Base Freq</button>
+            <button id="deviationMode" class="curveMode" type="button" data-parameter-help aria-describedby="deviationModeHelp">Deviation</button>
+            <button id="slopeMode" class="curveMode" type="button" data-parameter-help aria-describedby="slopeModeHelp">Spectral Slope</button>
+            <button id="modulationCurveMode" class="curveMode modulationCurveMode" type="button" hidden data-parameter-help aria-describedby="modulationCurveModeHelp">FM Strength</button>
+            <div class="toolToggle" role="group" aria-label="Curve editing tool">
+              <button id="penTool" class="active" type="button" aria-label="Pen" aria-pressed="true" title="Pen: add or move points. Shift-drag a point and following points vertically; X stays fixed. Esc cancels the group drag.">
+                <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L9 17l-4 1 1-4Z"/></svg>
+              </button>
+              <button id="eraserTool" type="button" aria-label="Eraser" aria-pressed="false" title="Eraser: click a point to delete. Mac: Option-click; PC: Ctrl-click">
+                <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 21-4-4a2 2 0 0 1 0-3L13 4a2 2 0 0 1 3 0l6 6a2 2 0 0 1 0 3l-8 8"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>
+              </button>
+            </div>
+            <details id="shortcutHelp" class="fileHelp shortcutHelp">
+              <summary title="Existing shortcuts by editing area">Shortcuts</summary>
+              <div class="fileHelpPanel" aria-label="Keyboard shortcuts"><strong>Keyboard shortcuts</strong><h3>Curve editing</h3><dl><dt>Shift-drag</dt><dd>Move this and following points vertically. X stays fixed.</dd><dt>Option-click</dt><dd>Mac: delete a point. PC: Ctrl-click. Endpoints stay protected.</dd><dt>Esc</dt><dd>Cancel the pending Shift group drag.</dd></dl><h3>Playback and controls</h3><dl><dt>Space</dt><dd>Play/pause after a selector is closed. Open menus, inputs and help keep their own keys.</dd><dt>Tab / Shift-Tab</dt><dd>Focus controls. Native range keys adjust the output slider; seeking into an IR tail remains unsupported.</dd></dl><p>Curve values are before modulation and file IR. Output progress includes the existing tail; it does not imply arbitrary tail seeking. Esc closes this guide.</p></div>
+            </details>
+          </div>
+        </div>
+
+        <section id="durationPanel" class="durationPanel" aria-label="Output Duration" title="Synthesis duration: 0–10 minutes; IR tail may extend output">
+          <label for="durationInput">Output Duration</label>
+          <input id="durationInput" type="range" min="0" max="600" step="1" value="20" aria-label="Output Duration" title="Synthesis duration: 0–10 minutes; IR tail may extend output">
+          <output id="durationValue" for="durationInput" title="Minutes:seconds">00:20</output>
+
+        </section>
+
+        <div class="workspace">
+          <div class="curveStack">
+
+<div id="sourceOverview" class="sourceOverview" hidden><canvas id="sourceOverviewCanvas" role="img" aria-label="Original imported audio, source-time waveform. Color indicates source frequency character, not synthesis output." title="Original imported file · Not synthesis output · No playback seeking"></canvas></div>
+<section id="voiceDetails" class="voiceDetails" aria-label="Synthesis details">
+              <div class="synthesisHeading" hidden>Synthesis detail <span>Oscillator / partial values · before modulation and file IR</span></div>
+        <div class="panel currentValues contextReadouts">
+          <div class="readout primaryReadout"><span>Editing</span><strong id="modeReadout">Base Freq</strong></div>
+          <div class="readout editContextEnd"><span>Curve points</span><strong id="pointsReadout">2</strong></div>
+          <div class="readout"><span title="Synthesis curve value or derived voice/stack value at the output playhead, before modulation, file IR and output processing. Not a selected point or rendered measurement.">Base · playhead</span><strong id="basePitchReadout">110 Hz</strong></div>
+          <div class="readout"><span title="Synthesis curve value or derived voice/stack value at the output playhead, before modulation, file IR and output processing. Not a selected point or rendered measurement.">Deviation · playhead</span><strong id="deviationReadout">0 cents</strong></div>
+          <div class="readout playbackGroupEnd"><span title="Synthesis curve value or derived voice/stack value at the output playhead, before modulation, file IR and output processing. Not a selected point or rendered measurement.">Slope · playhead</span><strong id="slopeReadout">-9.0 dB/oct</strong></div>
+          <div class="readout"><span title="Synthesis curve value or derived voice/stack value at the output playhead, before modulation, file IR and output processing. Not a selected point or rendered measurement.">Stack · playhead</span><strong id="stackReadout">Unison 4</strong></div>
+          <div class="readout"><span title="Synthesis curve value or derived voice/stack value at the output playhead, before modulation, file IR and output processing. Not a selected point or rendered measurement.">Voices · playhead</span><strong id="voicesReadout" title="Voices within the synthesis frequency limit at the current curve position / configured oscillators or analyzed partials. This is not playback status.">—</strong></div>
+          <div class="readout safetyReadout"><span>Safety</span><strong id="safetyReadout">auto gain / limiter</strong></div>
+        </div>
+
+            <div class="canvasFrame frequencyFrame" hidden tabindex="0" role="region" aria-label="Oscillator and partial values. Scroll horizontally to inspect all voices.">
+              <canvas id="frequencyCanvas" width="1800" height="110"></canvas>
+            </div>
+            </section>
+            <div class="canvasFrame curveFrame">
+              <canvas id="curveCanvas" width="1800" height="440" aria-label="Curve editor. Click to add or drag to move. Shift-drag a point and following points vertically with X fixed. Esc cancels. Mac Option-click deletes; PC Ctrl-click."></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+      <footer class="playbackBar" aria-label="Playback and output monitoring">
+        <div class="bottomTransport" aria-label="Transport controls">
+          <button id="rewindButton" type="button" aria-label="Return to start" title="Return to start" disabled></button>
+          <button id="playButton" type="button" aria-label="Play" title="Play · Space" disabled>Play</button>
+          <button id="stopButton" type="button" aria-label="Pause" title="Pause · Space" disabled>Pause</button>
+        </div>
+        <input id="playbackScrubber" type="range" min="0" max="1" step="0.0001" value="0" aria-label="Output playback position" disabled>
+        <output id="timeStatus" aria-label="Current playback time and duration">00:00.00 / 00:20.00</output>
+        <section class="outputMeter" aria-label="Stereo output level meter">
+          <div class="meterChannels">
+            <div class="meterRow" data-meter-channel="0">
+              <span class="meterChannelLabel">L</span>
+              <div class="meterTrack" aria-hidden="true"><div class="meterRms"></div><div class="meterPeak"></div><div class="meterHold"></div></div>
+              <span class="meterValue">-∞</span>
+            </div>
+            <div class="meterRow" data-meter-channel="1">
+              <span class="meterChannelLabel">R</span>
+              <div class="meterTrack" aria-hidden="true"><div class="meterRms"></div><div class="meterPeak"></div><div class="meterHold"></div></div>
+              <span class="meterValue">-∞</span>
+            </div>
+          </div>
+          <button id="meterClipButton" class="meterClip" type="button" aria-pressed="false" title="Clip indicator. Click to reset.">CLIP</button>
+        </section>
+      </footer>
+    </main>
+
+    <script src="src/file-help.js?v=20261028-family-guide1" type="module"></script>
+    <script src="src/app.js?v=20261107-shared-tools2" type="module"></script>
+  <div id="basePitchModeHelp" class="parameterHelp" role="tooltip" hidden><strong>Base Frequency · 20–4000 Hz</strong><span>Set the base for the oscillator stack, or transpose the analyzed partials in File Resynthesis.</span><span class="helpState"></span></div>
+<div id="deviationModeHelp" class="parameterHelp" role="tooltip" hidden><strong>Deviation · Depends on source and layout</strong><span>Unison spreads voices up to ±50 cents. Other layouts and File Resynthesis bend partial relationships with an amount of 0–0.38. Zero keeps the original layout.</span><span class="helpState"></span></div>
+<div id="slopeModeHelp" class="parameterHelp" role="tooltip" hidden><strong>Spectral Slope · −24 to +12 dB/oct</strong><span>Tilt voice or partial levels by frequency relative to the base. Negative values favor lower frequencies; positive values favor higher frequencies.</span><span class="helpState"></span></div>
+<div id="modulationCurveModeHelp" class="parameterHelp" role="tooltip" hidden><strong>Modulation Strength · FM / AM / Ring</strong><span>FM uses an index of 0–4. AM Depth and Ring Blend use 0–100%. The curve follows the selected modulation mode.</span><span class="helpState"></span></div>
+<script type="module" src="src/parameter-help.js?v=20261014-family1"></script>
+<script src="src/value-details.js?v=20261015-1" type="module"></script>
+  <script type="module" src="src/expanded-editor.js?v=20261015-height2"></script>
+  </body>
+</html>

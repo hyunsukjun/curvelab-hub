@@ -1,0 +1,245 @@
+export const TRANSFORM_CONSTANTS = Object.freeze({
+  minSpeed: -2,
+  maxSpeed: 2,
+  neutralSpeedNorm: 0.75,
+  freezeThreshold: 0.02,
+  minGrainSamples: 128,
+  minHopSamples: 24,
+  jitterFactor: 0.75,
+  speedSmoothing: 0.0008,
+  rateSmoothing: 0.0008,
+  gainSmoothing: 0.0015,
+  panSmoothing: 0.0015,
+  overlapCorrectionMin: 0.5,
+  overlapCorrectionMax: 2,
+  randomSeed: 0x4f1bbcdc
+});
+
+export function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+export function valueAt(curve, x) {
+  if (!curve || curve.length === 0) return 0;
+  if (x <= curve[0].x) return curve[0].y;
+  for (let i = 1; i < curve.length; i += 1) {
+    const a = curve[i - 1];
+    const b = curve[i];
+    if (x <= b.x) {
+      const t = (x - a.x) / Math.max(1e-6, b.x - a.x);
+      const eased = t * t * (3 - (2 * t));
+      return a.y + ((b.y - a.y) * eased);
+    }
+  }
+  return curve[curve.length - 1].y;
+}
+
+export function speedFromNorm(y) {
+  return TRANSFORM_CONSTANTS.minSpeed
+    + (clamp(y, 0, 1) * (TRANSFORM_CONSTANTS.maxSpeed - TRANSFORM_CONSTANTS.minSpeed));
+}
+
+export function centsFromNorm(y) {
+  return -2400 + (clamp(y, 0, 1) * 4800);
+}
+
+export function panFromNorm(y) {
+  return clamp((clamp(y, 0, 1) - 0.5) * 2, -1, 1);
+}
+
+export function grainEnvelope(phase) {
+  return Math.sin(Math.PI * clamp(phase, 0, 1));
+}
+
+export function grainMixScale(gain, density) {
+  return gain / Math.sqrt(Math.max(1, density * 0.8));
+}
+
+export function grainOverlapCorrection(envelopeSum, density) {
+  if (envelopeSum <= 1e-6) return 0;
+  const expectedEnvelopeSum = Math.max(1, density) * (2 / Math.PI);
+  return clamp(
+    expectedEnvelopeSum / envelopeSum,
+    TRANSFORM_CONSTANTS.overlapCorrectionMin,
+    TRANSFORM_CONSTANTS.overlapCorrectionMax
+  );
+}
+
+export function alignedGrainStart(left, right, nominal, rate, grainSamples, referencePos, referenceRate, maxOffset) {
+  if (!Number.isFinite(referencePos) || !Number.isFinite(referenceRate)) return nominal;
+  const probeCount = 32;
+  const probeStride = 2;
+  const searchStep = Math.max(1, Math.round(maxOffset / 80));
+  const span = (grainSamples - 1) * rate;
+  const earliest = Math.max(0, Math.ceil(-span), Math.round(nominal - maxOffset));
+  const latest = Math.min(left.length - 3, Math.floor(left.length - 3 - span), Math.round(nominal + maxOffset));
+  if (latest < earliest) return nominal;
+  let best = nominal;
+  let bestScore = -Infinity;
+  const referenceLeft = new Float32Array(probeCount);
+  const referenceRight = new Float32Array(probeCount);
+  let referenceEnergy = 0;
+  for (let i = 0; i < probeCount; i += 1) {
+    const pos = referencePos + (i * probeStride * referenceRate);
+    const l = readCubic(left, pos);
+    const r = readCubic(right, pos);
+    referenceLeft[i] = l;
+    referenceRight[i] = r;
+    referenceEnergy += (l * l) + (r * r);
+  }
+  if (referenceEnergy < 1e-7) return nominal;
+
+  // Match the previous grain's current waveform while penalizing large timing shifts.
+  const scoreAt = (start) => {
+    let correlation = 0;
+    let energy = 0;
+    for (let i = 0; i < probeCount; i += 1) {
+      const pos = start + (i * probeStride * rate);
+      const l = readCubic(left, pos);
+      const r = readCubic(right, pos);
+      correlation += (referenceLeft[i] * l) + (referenceRight[i] * r);
+      energy += (l * l) + (r * r);
+    }
+    if (energy < 1e-7) return -Infinity;
+    return (correlation / Math.sqrt(referenceEnergy * energy)) - (0.08 * Math.abs(start - nominal) / Math.max(1, maxOffset));
+  };
+  if (referencePos >= earliest && referencePos <= latest) {
+    best = referencePos;
+    bestScore = scoreAt(referencePos);
+  }
+  for (let start = earliest; start <= latest; start += searchStep) {
+    const score = scoreAt(start);
+    if (score > bestScore) {
+      bestScore = score;
+      best = start;
+    }
+  }
+  const refineStart = Math.max(earliest, best - searchStep);
+  const refineEnd = Math.min(latest, best + searchStep);
+  for (let start = refineStart; start <= refineEnd; start += 1) {
+    const score = scoreAt(start);
+    if (score > bestScore) {
+      bestScore = score;
+      best = start;
+    }
+  }
+  return bestScore > 0.4 ? best : nominal;
+}
+
+export function coherentGrainScale(gain, envelopeSum) {
+  return gain / Math.max(0.5, envelopeSum);
+}
+
+export function readCubic(buffer, pos) {
+  if (!buffer || buffer.length === 0 || pos < 0 || pos >= buffer.length - 3) return 0;
+  const i0 = Math.floor(pos);
+  const frac = pos - i0;
+  const xm1 = buffer[Math.max(0, i0 - 1)];
+  const x0 = buffer[i0];
+  const x1 = buffer[i0 + 1];
+  const x2 = buffer[Math.min(buffer.length - 1, i0 + 2)];
+  const a = (-0.5 * xm1) + (1.5 * x0) - (1.5 * x1) + (0.5 * x2);
+  const b = xm1 - (2.5 * x0) + (2 * x1) - (0.5 * x2);
+  const c = (-0.5 * xm1) + (0.5 * x1);
+  return (((a * frac) + b) * frac + c) * frac + x0;
+}
+
+export function curveIsNeutral(curve, neutralValue = 0.5, tolerance = 0.0001) {
+  return Boolean(curve?.length)
+    && curve.every((point) => Math.abs(point.y - neutralValue) < tolerance);
+}
+
+export function transformIsNeutral(stretchCurve, pitchCurve) {
+  return curveIsNeutral(stretchCurve, TRANSFORM_CONSTANTS.neutralSpeedNorm)
+    && curveIsNeutral(pitchCurve);
+}
+
+export function speedDirection(speed, fallback = 1) {
+  if (speed > TRANSFORM_CONSTANTS.freezeThreshold) return 1;
+  if (speed < -TRANSFORM_CONSTANTS.freezeThreshold) return -1;
+  return fallback < 0 ? -1 : 1;
+}
+
+export function effectiveSpeedAt(speedCurve, progress, globalDirection = 1) {
+  return speedFromNorm(valueAt(speedCurve, clamp(progress, 0, 1))) * (globalDirection < 0 ? -1 : 1);
+}
+
+export function initialPlaybackDirection(speedCurve, globalDirection = 1) {
+  const steps = 256;
+  for (let i = 0; i <= steps; i += 1) {
+    const speed = effectiveSpeedAt(speedCurve, i / steps, globalDirection);
+    if (Math.abs(speed) > TRANSFORM_CONSTANTS.freezeThreshold) return speed < 0 ? -1 : 1;
+  }
+  return globalDirection < 0 ? -1 : 1;
+}
+
+// A seek has no live grain history. Resolve the last non-Freeze direction
+// from the curve rather than inheriting whichever region played previously.
+export function readDirectionAtProgress(speedCurve, globalDirection, progress) {
+  const at = clamp(progress, 0, 1);
+  const speed = effectiveSpeedAt(speedCurve, at, globalDirection);
+  if (Math.abs(speed) > TRANSFORM_CONSTANTS.freezeThreshold) return speedDirection(speed);
+  // Smoothstep is monotonic between points; the latest non-Freeze knot gives
+  // the approach direction of a Freeze interval without a sampling grid.
+  for (let i = speedCurve.length - 1; i >= 0; i -= 1) {
+    const point = speedCurve[i];
+    if (point.x > at) continue;
+    const prior = speedFromNorm(point.y) * (globalDirection < 0 ? -1 : 1);
+    if (Math.abs(prior) > TRANSFORM_CONSTANTS.freezeThreshold) return speedDirection(prior);
+  }
+  return initialPlaybackDirection(speedCurve, globalDirection);
+}
+
+export function estimateOutputDuration(sourceDuration, speedCurve, steps = 1024) {
+  let distance = 0;
+  for (let i = 0; i < steps; i += 1) {
+    const speed = speedFromNorm(valueAt(speedCurve, (i + 0.5) / steps));
+    if (Math.abs(speed) > TRANSFORM_CONSTANTS.freezeThreshold) distance += Math.abs(speed);
+  }
+  const averageSpeed = distance / steps;
+  return averageSpeed > 1e-6 ? sourceDuration / averageSpeed : sourceDuration;
+}
+
+export function sourcePositionAtProgress(sourceDuration, speedCurve, globalDirection, progress, outputDuration = estimateOutputDuration(sourceDuration, speedCurve), steps = 1024) {
+  const safeProgress = clamp(progress, 0, 1);
+  // Seek over the duration the player actually uses, which may be capped for long files.
+  const initialDirection = initialPlaybackDirection(speedCurve, globalDirection);
+  let sourceSeconds = initialDirection < 0 ? sourceDuration : 0;
+  const completedSteps = Math.max(1, Math.ceil(steps * safeProgress));
+  const stepSize = safeProgress / completedSteps;
+  for (let i = 0; i < completedSteps; i += 1) {
+    const curveProgress = (i + 0.5) * stepSize;
+    const speed = effectiveSpeedAt(speedCurve, curveProgress, globalDirection);
+    sourceSeconds = clamp(sourceSeconds + (speed * outputDuration * stepSize), 0, sourceDuration);
+  }
+  return sourceSeconds;
+}
+
+export function transformCanUseDirect(stretchCurve, pitchCurve) {
+  if (!curveIsNeutral(pitchCurve)) return false;
+  if (!stretchCurve?.length) return false;
+  const firstSpeed = speedFromNorm(stretchCurve[0].y);
+  if (Math.abs(Math.abs(firstSpeed) - 1) > 0.0001) return false;
+  return stretchCurve.every((point) => Math.abs(speedFromNorm(point.y) - firstSpeed) < 0.0001);
+}
+
+export function grainStart(center, grainSamples, rate, bufferLength, jitter = 0) {
+  const span = (grainSamples - 1) * rate;
+  const minStart = Math.max(0, -span);
+  const maxStart = Math.max(minStart, Math.min(bufferLength - 3, bufferLength - 3 - span));
+  return clamp(center + jitter - (span * 0.5), minStart, maxStart);
+}
+
+export function smoothingForBlock(perSampleAmount, blockSize) {
+  return 1 - Math.pow(1 - perSampleAmount, Math.max(1, blockSize));
+}
+
+export function createSeededRandom(seed = TRANSFORM_CONSTANTS.randomSeed) {
+  let state = seed >>> 0;
+  return () => {
+    state ^= state << 13;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    return (state >>> 0) / 4294967296;
+  };
+}

@@ -1,0 +1,6 @@
+import {PlaybackBoundary} from '../labs/audio/src/playback-boundary.js';
+class HubPCMPlayer extends AudioWorkletProcessor{
+ constructor(){super();this.channels=null;this.at=0;this.playing=false;this.boundary=new PlaybackBoundary(sampleRate);this.tick=0;this.token=0;this.port.onmessage=({data:d})=>{if(d.type==='play'){this.channels=d.channels;this.at=d.frame;this.token=d.token;this.boundary.start();this.rendered=!!d.rendered;if(this.rendered&&d.frame===0)this.boundary.age=this.boundary.span;this.playing=true;}else if(d.type==='pause')this.boundary.release();else if(d.type==='stop'){if(this.playing)this.boundary.release();else this.channels=null;}};}
+ process(_,outputs){const out=outputs[0];if(this.playing&&this.channels){const len=this.channels[0].length;for(let i=0;i<out[0].length;i++){const gain=this.boundary.next(this.rendered?Infinity:len-this.at);for(let c=0;c<out.length;c++)out[c][i]=(this.channels[c]?.[this.at]||0)*gain;this.at++;if(this.boundary.done||this.at>=len){this.playing=false;this.port.postMessage({frame:Math.min(this.at,len),playing:false,token:this.token});break;}}if(++this.tick%16===0)this.port.postMessage({frame:this.at,playing:this.playing,token:this.token});}return true;}
+}
+registerProcessor('hub-pcm-player',HubPCMPlayer);

@@ -1,0 +1,43 @@
+/* Compact settings at narrow widths; keep all controls in their source order. */
+@media (max-width:899px) {
+  .sourceBand { padding-block:6px; gap:6px 10px; }
+  .controlBand { padding-block:6px; gap:8px 12px; align-items:start; }
+  .voiceDetails .synthesisHeading { padding-block:5px; }
+}
+@media (max-width:520px) {
+  .synthesisGroup {
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px 12px;
+    width:100%;
+    min-width:0;
+  }
+  .synthesisGroup .waveformButtons {
+    grid-column:1/-1;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:4px 6px;
+  }
+  .waveformButtons > span { grid-column:1/-1; }
+  .synthesisGroup .compactField { grid-template-columns:minmax(0,1fr); gap:4px; }
+  .synthesisGroup .compactField select { width:100%; min-width:0; }
+  .modulationGroup { border-left:0; padding-left:0; gap:8px 12px; }
+  .voiceDetails .synthesisHeading { padding-block:5px; }
+}
+
+/* Long file/status strings wrap instead of hiding their diagnostic content. */
+.impulseStatus, #analysisStatus {
+  min-width:0; max-width:100%; white-space:normal;
+  overflow-wrap:anywhere; overflow:visible; text-overflow:clip;
+}
+.resynthesisControls, .convolutionControls { min-width:0; max-width:100%; }
+.voiceDetails .frequencyFrame { overflow-x:auto; overflow-y:hidden; }
+#frequencyCanvas { max-width:none; height:110px !important; }
+
+/* One connected waveform selector; preserve individual native buttons/focus. */
+.synthesisGroup .waveformButtons { column-gap:0; row-gap:4px; }
+.waveformButtons > span { margin-right:7px; }
+.waveformButtons .waveformButton { border-radius:0; position:relative; }
+.waveformButtons .waveformButton + .waveformButton { margin-left:-1px; }
+.waveformButtons .waveformButton:first-of-type { border-radius:4px 0 0 4px; }
+.waveformButtons .waveformButton:last-of-type { border-radius:0 4px 4px 0; }
+.waveformButtons .waveformButton:is(.active,:focus-visible) { z-index:1; }

@@ -1,0 +1,83 @@
+/* Embedded layout only. Original controls, curve mapping and interaction stay intact. */
+html,body{margin:0!important;padding:0!important;min-height:0!important;height:auto!important;background:#30353c!important;overflow-x:hidden!important}body{display:block!important}.app{width:100%!important;max-width:none!important;min-height:0!important;padding:0 12px 8px!important;box-shadow:none!important;border:0!important;border-radius:0!important;display:block!important}.topbar,.playbackBar,.sourceEditPanel,.outputWaveFrame,.timelineFrame,#sourceOverview,.sourceFrame{display:none!important}.editor{padding:0!important;margin:0!important;min-height:0!important;--curve-height:var(--hub-curve-height,260px)!important;--frequency-height:0px!important}.workspace{min-height:0!important}.curveStack{gap:0!important;min-height:0!important}canvas#curveCanvas,canvas#waveCanvas:not(.unused){height:var(--hub-curve-height,260px)!important;min-height:170px!important}.spatialPanel{max-width:300px!important}.legend{margin-top:0!important}.panel{margin-bottom:0!important}#frequencyCanvas,.frequencyFrame{display:none!important}#sourceWaveCanvas{height:0!important}.playbackDock{position:static!important}#fileNotice,#fileStatus,#saveWavLink,.shortcutsLine{display:none!important}.topbar .actions{display:none!important}#durationPanel{margin:6px 0!important}#voiceDetails .synthesisHeading{display:none!important}.sourceBand{margin-top:0!important}
+@media(max-width:650px){.app{padding:0 8px 8px!important}.spatialPanel{width:180px!important;margin:8px auto!important}.workspace{display:block!important}}
+
+body[data-hub-lab="granular"] .sourceFrame{display:block!important}body[data-hub-lab="granular"] #sourceCanvas{height:90px!important}
+
+body[data-hub-lab="granular"] .engineReadout{display:none!important}
+
+/* Hub-only readout spacing: preserve every label, value and unit. */
+body[data-hub-lab="audio"] .panel.currentValues > .readout { grid-template-rows:minmax(14px,auto) minmax(18px,auto); }
+body[data-hub-lab="audio"] .panel.currentValues > .readout > span { white-space:normal; }
+@media(min-width:900px){
+ body[data-hub-lab="audio"] .panel.currentValues { grid-template-columns:120px 84px repeat(3,minmax(104px,max-content)) minmax(124px,1fr); column-gap:16px; }
+ body[data-hub-lab="audio"] .panel.currentValues > :is(.editContextEnd,.playbackGroupEnd)::after { right:-8px; }
+}
+
+/* Audio's standalone grid reserves hidden source-editor rows. The Hub owns height. */
+body[data-hub-lab="audio"] .app{height:auto!important}
+body[data-hub-lab="audio"] .editor{display:block!important;height:auto!important}
+body[data-hub-lab="audio"] .canvasFrame{display:block!important;height:auto!important;min-height:0!important}
+
+/* Embedded Lab chrome uses the Hub surface and a single, outer content rail. */
+:root{--lab-content-inset:0px!important}
+.app{padding:0 0 8px!important}
+.app,.editor,.workspace,.curveStack,.legend,.effectBar,.parameterBar,.currentValues,.durationPanel,.roomControls,.controlBand,.sourceBand,.impulseBand,.modulationInfo,.chainDiagram,.spatialPanel{background:#30353c!important}
+.editor>.legend,.editor>.effectBar,.editor>.parameterBar,.editor>.currentValues,.editor>.durationPanel,.editor>.roomControls,.editor>.sourceBand,.editor>.controlBand,.editor>.impulseBand,.editor>.modulationInfo,.editor>.chainDiagram{padding-inline:0!important}
+.editor>.canvasFrame,.editor>.curveStack,.editor>.workspace,.editor>.outputWaveFrame{margin-inline:0!important}
+body[data-hub-lab] .app .editor :is(.legend,.effectBar,.parameterBar,.currentValues,.durationPanel,.roomControls,.controlBand,.sourceBand,.impulseBand,.modulationInfo,.chainDiagram,.spatialPanel){background:#30353c!important}
+
+/* Nested settings/readouts must follow the same surface and rail as their editor. */
+body:is([data-hub-lab="space"],[data-hub-lab="spectral"],[data-hub-lab="oscillator"]) .app .editor :is(.voiceDetails,.valueDetails,.valueStrip,.parameterLegend){background:#30353c!important;margin-inline:0!important;padding-inline:0!important}
+body:is([data-hub-lab="space"],[data-hub-lab="spectral"],[data-hub-lab="oscillator"]) .app .editor :is(.currentValues,.controlBand,.sourceBand,.impulseBand,.durationPanel,.roomControls,.modulationInfo,.legend,.chainDiagram){padding-inline:0!important;margin-inline:0!important}
+@media(pointer:fine){
+ body[data-hub-density="compact"] .editor :is(.legend,.sourceBand,.controlBand,.impulseBand,.durationPanel,.roomControls,.modulationInfo){min-height:0!important;padding-block:4px!important;margin-block:0!important;row-gap:6px!important}
+ body[data-hub-density="compact"] .editor .currentValues{padding-block:4px!important;margin-block:0!important;row-gap:6px!important}
+ body[data-hub-density="compact"] .editor :is(.curveMode,.parameterButton,.effectModule,.waveformButton,#resynthesisMode,#convolutionButton,#clearCurveButton,#resetButton,.toolToggle button){min-height:30px!important;height:30px!important;font-size:12px!important}
+ body[data-hub-density="compact"] .editor select{min-height:30px!important;height:30px!important}
+ body[data-hub-density="compact"][data-hub-lab="granular"] #sourceCanvas{height:72px!important}
+ body[data-hub-density="compact"][data-hub-lab="space"] .spatialPanel{width:var(--hub-spatial-size)!important;max-width:var(--hub-spatial-size)!important}
+}
+@media(pointer:fine) and (min-width:900px){body[data-hub-density="compact"][data-hub-lab="space"] .workspace{grid-template-columns:minmax(0,1fr) var(--hub-spatial-size)!important}}
+@media(pointer:fine) and (min-width:1200px){
+ body[data-hub-density="compact"][data-hub-lab="granular"] .editor{display:grid!important;grid-template-columns:minmax(220px,.32fr) minmax(0,1fr);column-gap:16px}
+ body[data-hub-density="compact"][data-hub-lab="granular"] .editor>.legend{grid-column:1/-1;grid-row:1}
+ body[data-hub-density="compact"][data-hub-lab="granular"] .editor>.durationPanel{grid-column:1;grid-row:2}
+ body[data-hub-density="compact"][data-hub-lab="granular"] .editor>.currentValues{grid-column:2;grid-row:2}
+ body[data-hub-density="compact"][data-hub-lab="granular"] .editor>.curveStack{grid-column:1/-1;grid-row:3}
+ body[data-hub-density="compact"][data-hub-lab="granular"] #sourceCanvas{height:56px!important}
+ body[data-hub-density="compact"][data-hub-lab="oscillator"] .editor{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:16px}
+ body[data-hub-density="compact"][data-hub-lab="oscillator"] .editor>.sourceBand{grid-column:1;grid-row:1}
+ body[data-hub-density="compact"][data-hub-lab="oscillator"] .editor>.controlBand{grid-column:2;grid-row:1}
+ body[data-hub-density="compact"][data-hub-lab="oscillator"] .editor>:is(.impulseBand,.modulationInfo,.legend,.durationPanel,.workspace){grid-column:1/-1}
+}
+@media(pointer:fine) and (min-width:1200px){
+ body[data-hub-density="compact"][data-hub-lab="granular"] .editor>.currentValues{grid-template-columns:repeat(7,minmax(0,1fr))!important;min-height:0!important}
+ body[data-hub-density="compact"][data-hub-lab="granular"] .editor>.durationPanel{padding-block:2px!important}
+}
+@media(pointer:fine){body[data-hub-density="compact"] .editor{row-gap:0!important}}
+@media(pointer:fine) and (min-width:1200px){
+ body[data-hub-density="compact"][data-hub-lab="granular"] #durationPanel{margin-block:0!important}
+ body[data-hub-density="compact"][data-hub-lab="granular"] .editor>.currentValues{grid-template-rows:auto!important}
+}
+@media(pointer:fine) and (min-width:1200px){
+ body[data-hub-density="compact"][data-hub-lab="oscillator"] .editor>.sourceBand{grid-column:1/-1}
+ body[data-hub-density="compact"][data-hub-lab="oscillator"] .editor>.sourceBand .curveActions{position:relative;z-index:1}
+ body[data-hub-density="compact"][data-hub-lab="oscillator"] .editor>.controlBand.resynthesisActive{padding-right:220px!important}
+ body[data-hub-density="compact"][data-hub-lab="oscillator"] .editor>.controlBand:not(.resynthesisActive){grid-column:1/-1;grid-row:2}
+}
+/* All Timbre modes use the same Hub-owned curve height, including subparameters. */
+body[data-hub-lab="timbre"] .editor .canvasFrame #waveCanvas{position:static!important;inset:auto!important;height:var(--hub-curve-height,260px)!important;min-height:170px!important}
+body[data-hub-lab="timbre"] .editor>.canvasFrame{flex:0 0 auto!important;height:auto!important}
+@media(pointer:fine) and (min-width:1200px){
+ body[data-hub-lab="timbre"] .editor{display:grid!important;grid-template-columns:minmax(0,.45fr) minmax(0,1fr);column-gap:16px;row-gap:0}
+ body[data-hub-lab="timbre"] .editor>.effectBar{grid-column:1/-1;grid-row:1}
+ body[data-hub-lab="timbre"] .editor>.parameterBar{grid-column:1;grid-row:2;min-height:52px;align-content:center;box-sizing:border-box}
+ body[data-hub-lab="timbre"] .editor>.currentValues{grid-column:2;grid-row:2;min-height:52px;box-sizing:border-box}
+ body[data-hub-lab="timbre"] .editor:has(>.parameterBar[hidden])>.currentValues{grid-column:1/-1}
+ body[data-hub-lab="timbre"] .editor>:is(.parameterLegend,.canvasFrame,.chainDiagram){grid-column:1/-1}
+}
+@media(pointer:fine) and (min-width:1200px){body[data-hub-lab="timbre"] .editor>:is(.parameterBar,.currentValues){min-height:72px!important}}
+
+/* Shared Hub toolbar/help replaces duplicate visible controls only. Keep native DOM/listeners intact. */
+.toolToggle,#shortcutHelp{display:none!important}
