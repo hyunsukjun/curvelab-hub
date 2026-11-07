@@ -1,4 +1,4 @@
-import {renderSavedHistory} from './history-ui.js?v=20261107-redo-stage1';
+import {renderSavedHistory} from './history-ui.js?v=20261108-history-focus1';
 import {connectOutputMeter} from './output-meter-ui.js?v=20261107-shared-tools2';
 import {granularSourceMode} from './granular-source.js';
 import {NativeTransport} from './native-transport.js';

@@ -26,7 +26,13 @@ export function renderSavedHistory(root,view,{names,colors,disabled,select,remov
     if(!event.repeat&&!b.disabled)remove(n.id);
    });
   }
-  b.disabled=disabled;b.onclick=()=>select(n.id);return b;
+  b.disabled=disabled;
+  b.onclick=()=>{
+   // WebKit can activate a button without moving keyboard focus to it.
+   b.focus({preventScroll:true});
+   select(n.id);
+  };
+  return b;
  }
  const children=path.map(button);
  if(other.length){
