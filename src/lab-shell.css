@@ -39,6 +39,12 @@ body:is([data-hub-lab="space"],[data-hub-lab="spectral"],[data-hub-lab="oscillat
  body[data-hub-density="compact"][data-hub-lab="space"] .spatialPanel{width:var(--hub-spatial-size)!important;max-width:var(--hub-spatial-size)!important}
 }
 @media(pointer:fine) and (min-width:900px){body[data-hub-density="compact"][data-hub-lab="space"] .workspace{grid-template-columns:minmax(0,1fr) var(--hub-spatial-size)!important}}
+/* Wrap the Spatial View header when its square canvas needs the full panel width. */
+@media(max-width:1040px){
+ body[data-hub-lab="space"] .spatialPanel{display:flex;flex-wrap:wrap;justify-content:center}
+ body[data-hub-lab="space"] .spatialHeader{flex:1 0 auto;min-width:0;padding-inline:0}
+ body[data-hub-lab="space"] #spatialCanvas{flex:none;width:min(100%,clamp(180px,28dvh,240px))}
+}
 @media(pointer:fine) and (min-width:1200px){
  body[data-hub-density="compact"][data-hub-lab="granular"] .editor{display:grid!important;grid-template-columns:minmax(220px,.32fr) minmax(0,1fr);column-gap:16px}
  body[data-hub-density="compact"][data-hub-lab="granular"] .editor>.legend{grid-column:1/-1;grid-row:1}
