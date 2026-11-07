@@ -166,7 +166,7 @@ for(const element of [$('workspace-scroll'),document.querySelector('header'),doc
 new ResizeObserver(draw).observe($('wave'));
 window.addEventListener('resize',fitEditor);
 render(session.view());syncEditor();void loadDefaultSample();window.addEventListener('pagehide',()=>{editorLoadController?.abort();session.cancel();for(const r of records.values())void r.frame.contentWindow.hubBridge?.stop()});
-if(new URLSearchParams(location.search).has('test'))window.hubTest={session,transport,togglePlay,records,decode,run,switchLab,get active(){return active},get ready(){return ready},get workspace(){return workspace},get packet(){return packet},saveWorkspace};
+if(['localhost','127.0.0.1','[::1]'].includes(location.hostname)&&new URLSearchParams(location.search).has('test'))window.hubTest={session,transport,togglePlay,records,decode,run,switchLab,get active(){return active},get ready(){return ready},get workspace(){return workspace},get packet(){return packet},saveWorkspace};
 
 function applySharedTool(tool){if(ready){currentBridge()?.setEditingTool(tool||'pen');saveWorkspace();const rec=records.get(active);if(rec)rec.signature=signature(currentBridge().snapshot());}}
 for(const [id,tool]of [['source-pen','pen'],['source-eraser','eraser']])$(id).onclick=()=>sourceUI.setTool(sourceUI.tool===tool?null:tool);

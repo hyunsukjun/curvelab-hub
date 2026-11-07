@@ -1,5 +1,7 @@
 # CurveLab Hub
 
+[Open the public prototype](https://hyunsukjun.github.io/curvelab-hub/). This prototype is updated through the repository’s main branch.
+
 CurveLab Hub brings Audio, Timbre, Space, Granular, Spectral, and Oscillator into one browser workspace. Load an audio file, edit its source waveform, then move between labs to create saved processing stages.
 
 Serve this directory over HTTP from localhost or over HTTPS. Open its index page in a browser.
