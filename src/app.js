@@ -1,10 +1,10 @@
-import {renderSavedHistory} from './history-ui.js?v=20261108-history-chips1';
+import {renderSavedHistory} from './history-ui.js?v=20261108-working-edits1';
 import {connectOutputMeter} from './output-meter-ui.js?v=20261107-shared-tools2';
 import {granularSourceMode} from './granular-source.js';
 import {NativeTransport} from './native-transport.js';
-import {HubSession} from './session.js?v=20261107-redo-stage1';
+import {HubSession} from './session.js?v=20261108-working-edits1';
 import {renderJob} from './renderer.js?v=20261106-level2';
-import {connectSourceEditor} from './source-ui.js?v=20261107-shared-tools2';
+import {connectSourceEditor} from './source-ui.js?v=20261108-working-edits1';
 import {readAudioFile,validateAudioBuffer} from '../labs/audio/src/audio-import.js';
 import {summarizeChannels,peakOf,paintWaveform} from '../labs/audio/src/waveform-view.js';
 import {analyzeSourceColors} from '../labs/audio/src/source-colors.js';
@@ -35,7 +35,42 @@ async function getFrame(lab){
   const timer=setInterval(finish,80),timeout=setTimeout(()=>fail(new Error(title(lab)+' editor did not load. Retry or select another Lab.')),45000);frame.onload=finish;
  });records.set(lab,rec);$('frames').append(frame);frame.src=`labs/${lab}/index.html?hub=1&shell=20261107-shared-tools2`;return rec.promise;
 }
-async function syncEditor(){editorLoadController?.abort();const controller=new AbortController();editorLoadController=controller;const token=++syncSerial,previousFailure=editorFailure;ready=false;editorFailure=null;renderControls();try{const lab=active,rec=await getFrame(lab);if(token!==syncSerial)return;for(const [key,r]of records)r.frame.hidden=key!==lab;const p=session.packet(),id=session.view().current?.id,saved=structuredClone(workspace.byLab[lab]||null);rec.task=rec.task.catch(()=>{}).then(async()=>{if(token!==syncSerial)return;const bridge=rec.frame.contentWindow.hubBridge;if(rec.loadedId!==id){bridge.restore(rec.defaults);if(p?.channels[0].length)await bridge.load(p,{signal:controller.signal});rec.loadedId=id;}if(token!==syncSerial)return;if(saved)bridge.restore(saved);bridge.setEditingTool(sourceUI.tool||'pen');if(lab==='granular')await bridge.routeSource(granularSourceMode(workspace.grainChannel));bridge.resize();});await rec.task;if(token!==syncSerial)return;rec.frame.contentDocument.body.dataset.hubLab=lab;const snap=rec.frame.contentWindow.hubBridge.snapshot();workspace.byLab[lab]=snap;rec.signature=signature(snap);rec.processingSignature=signature({spec:rec.frame.contentWindow.hubBridge.spec(),asset:snap.extra?.impulseRevision});ready=true;dirty=!!workspace.dirtyByLab?.[lab];if(previousFailure&&session.error===previousFailure.message){session.error="";session.status="Editor ready · Current input retained";session.emit();}fitEditor();renderControls();}catch(e){if(token!==syncSerial)return;ready=false;editorFailure=e;showError(e);}}
+async function syncEditor(){
+ editorLoadController?.abort();
+ const controller=new AbortController();editorLoadController=controller;
+ const token=++syncSerial,previousFailure=editorFailure;
+ ready=false;editorFailure=null;renderControls();
+ try{
+  const lab=active,rec=await getFrame(lab);if(token!==syncSerial)return;
+  for(const [key,r]of records)r.frame.hidden=key!==lab;
+  const p=session.packet(),id=session.view().current?.inputId,saved=structuredClone(workspace.byLab[lab]||null);
+  rec.task=rec.task.catch(()=>{}).then(async()=>{
+   if(token!==syncSerial)return;
+   const bridge=rec.frame.contentWindow.hubBridge;
+   const reload=rec.loadedId!==id;
+   // Oscillator analyzes the new input with the saved partial count and IR.
+   const restoreBeforeLoad=reload&&lab==='oscillator'&&saved&&p?.channels[0].length;
+   if(reload){
+    bridge.restore(restoreBeforeLoad?saved:rec.defaults);
+    if(p?.channels[0].length)await bridge.load(p,{signal:controller.signal});
+    rec.loadedId=id;
+   }
+   if(token!==syncSerial)return;
+   if(saved&&!restoreBeforeLoad)bridge.restore(saved);
+   bridge.setEditingTool(sourceUI.tool||'pen');
+   if(lab==='granular')await bridge.routeSource(granularSourceMode(workspace.grainChannel));
+   bridge.resize();
+  });
+  await rec.task;if(token!==syncSerial)return;
+  rec.frame.contentDocument.body.dataset.hubLab=lab;
+  const bridge=rec.frame.contentWindow.hubBridge,snap=bridge.snapshot();
+  workspace.byLab[lab]=snap;rec.signature=signature(snap);
+  rec.processingSignature=signature({spec:bridge.spec(),asset:snap.extra?.impulseRevision});
+  ready=true;dirty=!!workspace.dirtyByLab?.[lab];
+  if(previousFailure&&session.error===previousFailure.message){session.error="";session.status="Editor ready · Current input retained";session.emit();}
+  fitEditor();renderControls();
+ }catch(e){if(token!==syncSerial)return;ready=false;editorFailure=e;showError(e);}
+}
 let editorRatio=0,editorBudget=610,layoutFrame=0,layoutRunning=false;
 function fitEditor(){
  if(layoutFrame)return;
@@ -71,8 +106,8 @@ function layoutEditors(){
  }finally{layoutRunning=false;}
 }
 
-function onCurrent(v){void stopPlayback();sourceCursor=0;lastId=v.current?.id;packet=session.packet();workspace=structuredClone(session.current?.workspace||{});workspace.byLab??={};active=workspace.active||active;workspace.active=active;workspace.grainChannel=granularSourceMode(workspace.grainChannel);$('grain-channel').value=workspace.grainChannel;zoom=1;viewStart=0;colorsData=null;peaks=packet?.channels[0].length?summarizeChannels(packet.channels):[];if(packet?.channels[0].length){const id=lastId;analyzeSourceColors({sampleRate:packet.sampleRate,length:packet.channels[0].length,numberOfChannels:packet.channels.length,getChannelData:i=>packet.channels[i]},data=>{if(lastId===id){colorsData=data;draw();}});}syncEditor();}
-function render(v){if(v.activeJob&&!lastBusy)void stopPlayback();lastBusy=v.activeJob;if(v.current?.id!==lastId)onCurrent(v);sourceUI.render(v);$('input-name').textContent=packet?.name||v.current?.label||'Loading audio…';$('input-name').title=$('input-name').textContent;$('metadata').textContent=v.current?`${v.current.channels}ch · 48 kHz`:'';$('length').textContent=v.current?fmt(v.current.frames/48000):'';paintStatus(v.status,v.activeJob);$('import-error').hidden=!v.error;$('import-error').textContent=v.error;$('cancel').hidden=!v.activeJob;$('progress').hidden=!v.activeJob;$('progress').value=v.progress;$('frame-block').hidden=!v.activeJob;$('frame-block').textContent=v.status;renderSavedHistory($('history'),v,{names,colors,disabled:assetLoading||v.activeJob,select:id=>{saveWorkspace();stopPlayback();session.restore(id)},remove:id=>{if(ready&&!sourceUI.busy&&!assetLoading&&!currentBridge()?.busy?.())session.deleteSelectedStage(id)},undoRemove:undoStageDeletion,redoRemove:redoStageDeletion});renderControls();draw();}
+function onCurrent(v){void stopPlayback();sourceCursor=0;lastId=v.current?.inputId;packet=session.packet();workspace=structuredClone(session.current?.workspace||{});workspace.byLab??={};active=workspace.active||active;workspace.active=active;workspace.grainChannel=granularSourceMode(workspace.grainChannel);$('grain-channel').value=workspace.grainChannel;zoom=1;viewStart=0;colorsData=null;peaks=packet?.channels[0].length?summarizeChannels(packet.channels):[];if(packet?.channels[0].length){const id=lastId;analyzeSourceColors({sampleRate:packet.sampleRate,length:packet.channels[0].length,numberOfChannels:packet.channels.length,getChannelData:i=>packet.channels[i]},data=>{if(lastId===id){colorsData=data;draw();}});}syncEditor();}
+function render(v){if(v.activeJob&&!lastBusy)void stopPlayback();lastBusy=v.activeJob;if(v.current?.inputId!==lastId)onCurrent(v);sourceUI.render(v);$('input-name').textContent=packet?.name||v.current?.label||'Loading audio…';$('input-name').title=$('input-name').textContent;$('metadata').textContent=v.current?`${v.current.channels}ch · 48 kHz`:'';$('length').textContent=v.current?fmt(v.current.frames/48000):'';paintStatus(v.status,v.activeJob);$('import-error').hidden=!v.error;$('import-error').textContent=v.error;$('cancel').hidden=!v.activeJob;$('progress').hidden=!v.activeJob;$('progress').value=v.progress;$('frame-block').hidden=!v.activeJob;$('frame-block').textContent=v.status;renderSavedHistory($('history'),v,{names,colors,disabled:assetLoading||v.activeJob,select:id=>{if(id!==session.current?.id){saveWorkspace();stopPlayback();session.restore(id)}},remove:id=>{if(ready&&!sourceUI.busy&&!assetLoading&&!currentBridge()?.busy?.())session.deleteSelectedStage(id)},undoRemove:undoStageDeletion,redoRemove:redoStageDeletion});renderControls();draw();}
 function eligibility(){const v=session.view();if(sourceUI.busy)return 'Applying source volume…';if(assetLoading)return 'Loading separate IR…';if(ready&&records.get(active)?.frame.contentWindow.hubBridge?.busy?.())return 'Preparing analysis or IR…';if(!ready)return editorFailure?.message||'Loading editor…';if(!v.current?.frames)return 'Open audio to begin';if(v.current.frames<4)return 'At least four source frames are required.';if(v.current.channels!==2)return 'Stereo input required; no automatic downmix.';const spec=records.get(active).frame.contentWindow.hubBridge.spec();if((spec.format&&spec.format!=='stereo')||(spec.settings?.format&&spec.settings.format!=='stereo'))return 'This integration currently supports stereo handoff. Choose Stereo 2ch.';if(active==='granular'&&!['mix','0','1'].includes($('grain-channel').value))return 'Choose Mono mix, Left or Right.';if(active==='oscillator'&&spec.settings.soundMode==='resynthesis'&&!spec.settings.analysisResult)return 'Analyzing current input…';return '';}
 function renderControls(){
  const v=session.view(),preparing=sourceUI.busy||assetLoading||Boolean(ready&&currentBridge()?.busy?.());
@@ -82,6 +117,7 @@ function renderControls(){
  $('frame-block').hidden=!v.activeJob&&!preparing&&ready;
  $('frame-block').textContent=v.activeJob?v.status:assetLoading?'Loading separate IR…':preparing?'Preparing analysis…':editorFailure?'Editor unavailable · Retry editor':'Loading editor…';
  $('retry-editor').hidden=!editorFailure;$('retry-editor').disabled=v.activeJob||preparing;
+ $('restore-original').hidden=!v.current?.parentId&&!v.edit?.modified;$('restore-original').disabled=preparing||v.activeJob;
  $('file').disabled=preparing||v.activeJob;$('open-ir').disabled=preparing||v.activeJob;$('grain-channel').disabled=preparing||v.activeJob;
  for(const b of $('labs').children){b.setAttribute('aria-pressed',b.dataset.lab===active);b.disabled=v.activeJob||preparing;}
  let blocked='';try{blocked=eligibility();}catch(e){blocked=e.message;}
@@ -90,7 +126,7 @@ function renderControls(){
  $('play').textContent=pending?'…':state.playing?'Ⅱ':'▶';
  $('play').setAttribute('aria-label',transport.pausing?(transport.pending.resume?'Cancel resume':'Resume after pause'):pending?'Cancel playback request':state.playing?'Pause':'Play');$('play').setAttribute('aria-busy',String(pending));
  $('seek').disabled=$('rewind').disabled=(pending&&!transport.pausing)||v.activeJob||!!blocked||state.busy;
- $('export').disabled=v.activeJob||!v.current?.frames;$('export').title=v.current?'Download saved stage: '+v.current.label+'. Uncommitted changes excluded.':'Download selected stage';$('draft-state').hidden=!dirty||!ready;$('granular-route').hidden=active!=='granular';
+ $('export').disabled=v.activeJob||!session.current?.packet.channels[0].length;$('export').title=v.current?'Download saved stage: '+v.current.label+'. Uncommitted changes excluded.':'Download selected stage';$('draft-state').hidden=!dirty||!ready;$('granular-route').hidden=active!=='granular';
  let mode='';if(ready&&active==='oscillator')mode=currentBridge().spec().settings.soundMode;$('open-ir').hidden=mode!=='convolution';
  $('lab-status').textContent=blocked||(active==='granular'?`Grain source: ${$('grain-channel').selectedOptions[0]?.textContent||'Mono mix'}`:active==='oscillator'?(mode==='resynthesis'?'File Resynthesis':'Oscillator + File IR'):active==='space'?'Live HRTF preview':'');
 }
@@ -109,7 +145,11 @@ async function switchLab(lab){
  if(lab===active){if(!ready)await syncEditor();return false;}
  if(session.job||assetLoading||currentBridge()?.busy?.())return false;
  const blocked=eligibility();if(blocked){showError(new Error(blocked));return false;}
- const from=active;await stopPlayback();await currentBridge()?.prepareOutput?.();if(active!==from||session.job)return false;saveWorkspace();const spec=currentSpec();
+ const from=active,inputId=session.working?.id;
+ const sameInput=()=>ready&&active===from&&session.working?.id===inputId&&!session.job&&!sourceUI.busy;
+ await stopPlayback();if(!sameInput())return false;
+ await currentBridge().prepareOutput?.();if(!sameInput())return false;
+ saveWorkspace();const spec=currentSpec();
  return session.handoff(from,spec,workspace,lab,(candidate,valid,signal)=>prepareTarget(lab,candidate,valid,signal));
 }
 for(const [i,lab]of names.entries()){const b=document.createElement('button');b.textContent=title(lab);b.dataset.lab=lab;b.style.setProperty('--lab-color',colors[i]);b.onclick=()=>switchLab(lab).catch(showError);$('labs').append(b)}
@@ -139,6 +179,11 @@ setInterval(updateTransport,100);
 window.addEventListener('keydown',e=>{if($('hub-info').open||e.target.closest?.('#hub-info-button'))return;if(e.code==='Space'&&!e.target.matches('input,select,textarea,summary')&&!e.target.isContentEditable){e.preventDefault();if(!e.repeat)togglePlay();}});
 async function decode(file){const bytes=await readAudioFile(file,48000),ctx=new OfflineAudioContext(2,1,48000),b=await ctx.decodeAudioData(bytes);await validateAudioBuffer(b);if(![1,2].includes(b.numberOfChannels))throw new Error('Multichannel file: open a mono or stereo file. Previous audio retained.');const channels=Array.from({length:b.numberOfChannels},(_,i)=>{const c=new Float32Array(b.length);b.copyFromChannel(c,i);return c;});if(channels.length===1)channels.push(channels[0].slice());return {name:file.name,sampleRate:b.sampleRate,channels};}
 $('file').onchange=()=>{const f=$('file').files[0];if(f){saveWorkspace();stopPlayback();session.load(()=>decode(f));}$('file').value=''};function loadDefaultSample(){return session.load(async()=>{const r=await fetch('labs/audio/assets/audio/bach-prelude-72bpm.mp3');if(!r.ok)throw new Error('Sample unavailable');return decode(new File([await r.blob()],'Bach Prelude.mp3'));});}
+$('restore-original').onclick=()=>{
+ const original=session.original();if(!original||session.job)return;
+ saveWorkspace();void stopPlayback();
+ if(session.restore(original.id))$('wave').focus({preventScroll:true});
+};
 $('export').onclick=async()=>{try{
  if(session.job)return;const stage=session.current;if(!stage?.packet?.channels[0]?.length)return;const p=stage.packet;
  let clipped=0;for(const c of p.channels)for(const x of c)if(Math.abs(x)>1)clipped++;

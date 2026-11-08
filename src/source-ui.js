@@ -13,7 +13,7 @@ export function connectSourceEditor(session,repaint,getView=()=>({start:0,end:se
  function refresh(){render(session.view());repaint();}
  async function applyVolume(next,id,pause){
   if(pending)return;pending=true;refresh();busyChanged();
-  try{await pause;if(session.current?.id===id&&!session.job)await session.edit('volume',next.volume);}
+  try{await pause;if(session.working?.id===id&&!session.job)await session.edit('volume',next.volume);}
   catch(e){session.error=e.message;session.status='Volume not applied: '+e.message;session.emit();}
   finally{pending=false;refresh();busyChanged();}
  }
@@ -39,16 +39,16 @@ export function connectSourceEditor(session,repaint,getView=()=>({start:0,end:se
   if(kind==='select'&&(e.metaKey||editing())){
    const g=geom(r);if(e.clientY<r.top+g.top||e.clientY>r.top+g.bottom)return;
    e.preventDefault();wave.focus();held=!!e.metaKey;const state=model(v),hit=volumeHit(state,v.current.frames,getView(),rect(),e);
-   if(e.altKey||activeTool()==='eraser'){if(hit!==null){selected=hit;const next=eraseVolumePoint(state,hit);if(next!==state)void applyVolume(next,v.current.id,Promise.resolve().then(beforeVolume));}refresh();return;}
+   if(e.altKey||activeTool()==='eraser'){if(hit!==null){selected=hit;const next=eraseVolumePoint(state,hit);if(next!==state)void applyVolume(next,v.current.inputId,Promise.resolve().then(beforeVolume));}refresh();return;}
    const p=volumePointer(e,rect(),getView()),draft=hit===null?putVolumePoint(state,v.current.frames,p.frame,p.gain):state;
    selected=hit===null?volumePoints(draft,v.current.frames).findIndex(p=>p.frame===Math.min(v.current.frames-1,Math.round(frame(e)))):hit;
    if(selected<0){session.status='Volume point limit reached (512). Remove a point before adding another.';session.emit();return;}
    const pause=Promise.resolve().then(beforeVolume);pause.catch(()=>{});
-   gesture={kind:'volume',previous:state,draft,index:selected,x:e.clientX,y:e.clientY,target:e.currentTarget,id:e.pointerId,node:v.current.id,pause};
+   gesture={kind:'volume',previous:state,draft,index:selected,x:e.clientX,y:e.clientY,target:e.currentTarget,id:e.pointerId,node:v.current.inputId,pause};
    e.currentTarget.setPointerCapture(e.pointerId);refresh();return;
   }
   if(kind!=='select'&&editing())return;
-  e.preventDefault();e.currentTarget.focus();gesture={kind,start:frame(e),at:frame(e),value:kind==='select'?0:v.edit[kind],target:e.currentTarget,id:e.pointerId,node:v.current.id};e.currentTarget.setPointerCapture(e.pointerId);repaint();
+  e.preventDefault();e.currentTarget.focus();gesture={kind,start:frame(e),at:frame(e),value:kind==='select'?0:v.edit[kind],target:e.currentTarget,id:e.pointerId,node:v.current.inputId};e.currentTarget.setPointerCapture(e.pointerId);repaint();
  }
  for(const [target,kind]of [[wave,'select'],[$('fade-in-handle'),'fadeIn'],[$('fade-out-handle'),'fadeOut']]){
   target.addEventListener('pointerdown',e=>down(e,kind));target.addEventListener('pointermove',move);target.addEventListener('pointerup',e=>finish(false,e));target.addEventListener('pointercancel',()=>finish(true));target.addEventListener('lostpointercapture',()=>finish(true));
@@ -61,9 +61,10 @@ export function connectSourceEditor(session,repaint,getView=()=>({start:0,end:se
   if(e.key==='Meta'&&editable()&&!e.target.matches('input,select,textarea')&&!e.target.isContentEditable){held=true;refresh();}
  },true);
  wave.addEventListener('keydown',e=>{
-  if(!editable()||gesture)return;const v=session.view();
-  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='a'){e.preventDefault();session.select(0,v.current.frames);return;}
+  if(gesture||pending||view?.activeJob)return;
   if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?session.redoEdit():session.undoEdit();return;}
+  if(!editable())return;const v=session.view();
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='a'){e.preventDefault();session.select(0,v.current.frames);return;}
   if(editing()){
    const state=model(v),points=volumePoints(state,v.current.frames),p=points[selected];let next=null,handled=true;
    if(e.key==='ArrowLeft'||e.key==='ArrowRight')selected=Math.max(0,Math.min(points.length-1,selected+(e.key==='ArrowRight'?1:-1)));
@@ -72,7 +73,7 @@ export function connectSourceEditor(session,repaint,getView=()=>({start:0,end:se
    else if(e.key==='Enter'){const at=Math.max(0,Math.min(v.current.frames-1,Math.round(getCursor())));next=putVolumePoint(state,v.current.frames,at,1);selected=volumePoints(next,v.current.frames).findIndex(p=>p.frame===Math.min(v.current.frames-1,at));}
    else if(['Delete','Backspace'].includes(e.key))next=eraseVolumePoint(state,selected);
    else handled=false;
-   if(handled){e.preventDefault();e.stopImmediatePropagation();if(next&&next!==state)void applyVolume(next,v.current.id,Promise.resolve().then(beforeVolume));else refresh();return;}
+   if(handled){e.preventDefault();e.stopImmediatePropagation();if(next&&next!==state)void applyVolume(next,v.current.inputId,Promise.resolve().then(beforeVolume));else refresh();return;}
   }else{
    if(['Delete','Backspace'].includes(e.key)){e.preventDefault();void session.edit('delete');}
    if(e.key==='Escape'){e.preventDefault();session.select(null);}
@@ -84,10 +85,10 @@ export function connectSourceEditor(session,repaint,getView=()=>({start:0,end:se
   const changed=await session.edit(side,e.key==='Home'?0:v.edit[side]+delta);if(changed&&document.activeElement===document.body&&target.isConnected&&!target.disabled)target.focus({preventScroll:true});
  });
  $('delete').onclick=()=>!editing()&&session.edit('delete');$('undo-edit').onclick=()=>session.undoEdit();$('redo-edit').onclick=()=>session.redoEdit();
- $('volume-reset').onclick=()=>{if(editable()&&!gesture)void applyVolume({...model(session.view()),volume:[]},session.current.id,Promise.resolve().then(beforeVolume));};
+ $('volume-reset').onclick=()=>{if(editable()&&!gesture)void applyVolume({...model(session.view()),volume:[]},session.working.id,Promise.resolve().then(beforeVolume));};
  function render(v){
-  view=v;if(gesture&&(gesture.node!==v.current?.id||v.activeJob))finish(true);
-  if(lastNode!==v.current?.id){lastNode=v.current?.id;selected=Math.min(selected,Math.max(0,volumePoints(model(v),v.current?.frames||0).length-1));}
+  view=v;if(gesture&&(gesture.node!==v.current?.inputId||v.activeJob))finish(true);
+  if(lastNode!==v.current?.inputId){lastNode=v.current?.inputId;selected=Math.min(selected,Math.max(0,volumePoints(model(v),v.current?.frames||0).length-1));}
   const active=!!v.edit&&!v.activeJob&&!pending,n=v.current?.frames||0,volume=editing();
   $('delete').disabled=!active||volume||!v.edit.selection;$('undo-edit').disabled=!active||!v.edit.canUndo;$('redo-edit').disabled=!active||!v.edit.canRedo;
   for(const [id,tool]of [['source-pen','pen'],['source-eraser','eraser']]){$(id).disabled=!active||!n;$(id).setAttribute('aria-pressed',String(volume&&activeTool()===tool));}$('volume-reset').hidden=!v.edit?.volume?.length;$('volume-reset').disabled=!active||!v.edit?.volume?.length;
