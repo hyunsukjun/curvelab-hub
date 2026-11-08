@@ -110,8 +110,15 @@ main>.status-line{padding-inline:calc(var(--hub-rail-safe) + var(--hub-scrollbar
 #draft-state{border:1px solid #8292a0;border-radius:10px;padding:0 8px;font-size:10px;color:#d9e2eb}
 .route{justify-content:flex-start;gap:10px}
 .route #granular-route,.route #open-ir{margin-left:auto}
-.source .actions #undo-edit{margin-left:8px}
-.source .actions #delete{margin-left:8px}
+.source .actions .hub-help-anchor{display:inline-flex}
+.source .actions .hub-help-anchor:has(> :is(#undo-edit,#delete)){margin-left:8px}
+.hub-help-anchor>button:disabled{pointer-events:none}
+#hub-control-help{
+ position:fixed;z-index:1000;width:max-content;max-width:min(300px,calc(100vw - 24px));
+ padding:9px 12px;border:1px solid #65717d;border-radius:6px;background:#252e39;
+ color:#e0e6ee;box-shadow:0 5px 18px #0005;font-size:12px;line-height:1.5;overflow-wrap:anywhere;
+}
+#hub-control-help:lang(ko){word-break:keep-all}
 #output-meter{display:grid;grid-template-columns:minmax(0,1fr) var(--output-value);align-items:center;gap:var(--output-gap);min-height:var(--transport-hit-height)}
 .hub-meter-channels{display:grid;gap:5px;min-width:0}
 .hub-meter-row{display:grid;grid-template-columns:10px minmax(0,1fr);gap:var(--output-gap);align-items:center;font-size:9px;color:#bdc8d3}

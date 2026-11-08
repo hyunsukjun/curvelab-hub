@@ -1,6 +1,7 @@
 // Hub input adapter. Volume, deletion and fade calculations use the pinned Audio core.
 import {volumePoints,volumeNorm,volumeDb,volumeLabel,volumeGainAt,putVolumePoint,eraseVolumePoint,hasSourceVolume} from '../labs/audio/src/source-volume.js?v=20261028-volume-line1';
 import {volumePointer,volumeHit} from '../labs/audio/src/source-volume-view.js?v=20261028-volume-line1';
+import {tooltipLanguage} from './tooltip-language.js?v=20261108-tooltip-language1';
 export function connectSourceEditor(session,repaint,getView=()=>({start:0,end:session.view().current?.frames||0}),seek=()=>{},beforeVolume=()=>{},busyChanged=()=>{},getCursor=()=>getView().start,toolChanged=()=>{}){
  const $=id=>document.getElementById(id),wave=$('wave');let gesture=null,view=null,held=false,latched=false,volumeTool='pen',selected=0,pending=false,lastNode=null;
  const seconds=n=>Number(n.toFixed(6)).toString(),editing=()=>held||latched||gesture?.kind==='volume',activeTool=()=>held?'pen':volumeTool;
@@ -104,7 +105,9 @@ export function connectSourceEditor(session,repaint,getView=()=>({start:0,end:se
   if(range&&range[1]>range[0]){ctx.save();ctx.beginPath();ctx.rect(64,0,w-76,h);ctx.clip();ctx.fillStyle='#8abdED25';ctx.fillRect(x(range[0]),0,x(range[1])-x(range[0]),h);ctx.strokeStyle='#9dcafa';ctx.strokeRect(x(range[0]),1,x(range[1])-x(range[0]),h-2);ctx.restore();}
   for(const [side,id]of [['fadeIn','fade-in-handle'],['fadeOut','fade-out-handle']]){
    const f=gesture?.kind===side?gesture.value:v.edit[side],at=side==='fadeIn'?f:n-f,fraction=(at-viewport.start)/span;
-   $(id).hidden=editing()||fraction<0||fraction>1;$(id).style.left=`calc(${fraction*100}% + ${64-76*fraction}px)`;$(id).title=`${side==='fadeIn'?'Fade in':'Fade out'} · ${seconds(f/v.current.sampleRate)} s`;
+   $(id).hidden=editing()||fraction<0||fraction>1;$(id).style.left=`calc(${fraction*100}% + ${64-76*fraction}px)`;
+   const help = side === 'fadeIn' ? 'Drag to set the fade-in length.' : 'Drag to set the fade-out length.';
+   $(id).title = `${tooltipLanguage.text('hub.'+side, help)} · ${seconds(f/v.current.sampleRate)} s`;
    if(f){ctx.strokeStyle='#a6c3d0';ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(x(side==='fadeIn'?0:n),h-8);ctx.lineTo(x(at),8);ctx.stroke();ctx.setLineDash([]);}
   }
   const state=gesture?.kind==='volume'?gesture.draft:model(v);if(!editing()&&!hasSourceVolume(state))return;

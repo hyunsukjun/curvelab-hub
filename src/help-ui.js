@@ -14,7 +14,7 @@ const languages = [
 ];
 const preferenceKey = 'curvelab-hub-help-language';
 
-export function connectHubHelp(dialog, openButton) {
+export function connectHubHelp(dialog, openButton, languageChanged) {
   const title = dialog.querySelector('h2');
   const select = dialog.querySelector('#hub-info-language');
   const closeButton = dialog.querySelector('#hub-info-close');
@@ -59,6 +59,7 @@ export function connectHubHelp(dialog, openButton) {
     ]) {
       nodes.forEach((node, index) => { node.textContent = values[index]; });
     }
+    languageChanged(dialog.lang);
   }
 
   let preferred = 'en';

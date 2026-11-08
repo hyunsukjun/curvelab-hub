@@ -1,18 +1,22 @@
-import {connectHubHelp} from './help-ui.js?v=20261108-help-languages1';
-import {renderSavedHistory} from './history-ui.js?v=20261108-working-edits1';
+import {connectHubHelp} from './help-ui.js?v=20261108-tooltip-language1';
+import {createControlHelp} from './control-help.js?v=20261108-tooltip-language1';
+import {tooltipLanguage} from './tooltip-language.js?v=20261108-tooltip-language1';
+import {labTooltipCopy} from './lab-tooltip-copy.js?v=20261108-english-help1';
+import {renderSavedHistory, refreshSavedHistoryTitles} from './history-ui.js?v=20261108-tooltip-language1';
 import {connectOutputMeter} from './output-meter-ui.js?v=20261107-shared-tools2';
 import {granularSourceMode} from './granular-source.js';
 import {NativeTransport} from './native-transport.js';
 import {HubSession} from './session.js?v=20261108-relative-gain1';
 import {OUTPUT_GAIN_MIN_DB,OUTPUT_GAIN_MAX_DB} from './output-gain.js?v=20261108-relative-gain1';
 import {renderJob} from './renderer.js?v=20261106-level2';
-import {connectSourceEditor} from './source-ui.js?v=20261108-working-edits1';
+import {connectSourceEditor} from './source-ui.js?v=20261108-tooltip-language1';
 import {readAudioFile,validateAudioBuffer} from '../labs/audio/src/audio-import.js';
 import {summarizeChannels,peakOf,paintWaveform} from '../labs/audio/src/waveform-view.js';
 import {analyzeSourceColors} from '../labs/audio/src/source-colors.js';
 import {createSourceOverview} from '../labs/audio/src/source-overview.js';
 import {encodeWav} from '../labs/granular/src/granular-core.js';
 const $=id=>document.getElementById(id),names=['audio','timbre','space','granular','spectral','oscillator'],colors=['#91bde9','#e2cd83','#b99be9','#da9dbf','#e0a58a','#81cdbd'];
+const controlHelp=createControlHelp();
 const outputGain=$('output-gain');
 outputGain.min=String(OUTPUT_GAIN_MIN_DB);
 outputGain.max=String(OUTPUT_GAIN_MAX_DB);
@@ -47,7 +51,7 @@ async function getFrame(lab){
  rec.promise=new Promise((resolve,reject)=>{
   let settled=false;
   const fail=error=>{if(settled)return;settled=true;clearInterval(timer);clearTimeout(timeout);if(records.get(lab)===rec)records.delete(lab);frame.remove();reject(error);};
-  const finish=()=>{if(settled)return;try{const bridge=frame.contentWindow?.hubBridge;if(!bridge)return;const defaults=bridge.defaults();frame.contentDocument.body.dataset.hubLab=lab;rec.defaults=defaults;settled=true;clearInterval(timer);clearTimeout(timeout);resolve(rec);}catch(error){fail(new Error(title(lab)+' editor could not initialize: '+(error.message||String(error))));}};
+  const finish=()=>{if(settled)return;try{const bridge=frame.contentWindow?.hubBridge;if(!bridge)return;const defaults=bridge.defaults();frame.contentDocument.body.dataset.hubLab=lab;controlHelp.connectLab(frame,lab,labTooltipCopy[lab]);rec.defaults=defaults;settled=true;clearInterval(timer);clearTimeout(timeout);resolve(rec);}catch(error){fail(new Error(title(lab)+' editor could not initialize: '+(error.message||String(error))));}};
   const timer=setInterval(finish,80),timeout=setTimeout(()=>fail(new Error(title(lab)+' editor did not load. Retry or select another Lab.')),45000);frame.onload=finish;
  });records.set(lab,rec);$('frames').append(frame);
  const shellVersion=lab==='granular'?'20261108-granular-pointerup1':'20261108-button-tone-b1';
@@ -149,7 +153,7 @@ function renderControls(){
  $('play').textContent=pending?'…':state.playing?'Ⅱ':'▶';
  $('play').setAttribute('aria-label',transport.pausing?(transport.pending.resume?'Cancel resume':'Resume after pause'):pending?'Cancel playback request':state.playing?'Pause':'Play');$('play').setAttribute('aria-busy',String(pending));
  $('seek').disabled=$('rewind').disabled=(pending&&!transport.pausing)||v.activeJob||!!blocked||state.busy;
- $('export').disabled=v.activeJob||!session.current?.packet.channels[0].length;$('export').title=v.current?'Download saved stage: '+v.current.label+'. Uncommitted changes excluded.':'Download selected stage';$('draft-state').hidden=!dirty||!ready;$('granular-route').hidden=active!=='granular';
+ $('export').disabled=v.activeJob||!session.current?.packet.channels[0].length;refreshExportTitle(v.current);$('draft-state').hidden=!dirty||!ready;$('granular-route').hidden=active!=='granular';
  let mode='';if(ready&&active==='oscillator')mode=currentBridge().spec().settings.soundMode;$('open-ir').hidden=mode!=='convolution';
  $('lab-status').textContent=blocked||(active==='granular'?`Grain source: ${$('grain-channel').selectedOptions[0]?.textContent||'Mono mix'}`:active==='oscillator'?(mode==='resynthesis'?'File Resynthesis':'Oscillator + File IR'):active==='space'?'Live HRTF preview':'');
 }
@@ -176,7 +180,15 @@ async function switchLab(lab){
  saveWorkspace();const spec=currentSpec();
  return session.handoff(from,spec,workspace,lab,(candidate,valid,signal)=>prepareTarget(lab,candidate,valid,signal),{outputGainDb:outputGain.valueAsNumber});
 }
-for(const [i,lab]of names.entries()){const b=document.createElement('button');b.textContent=title(lab);b.dataset.lab=lab;b.style.setProperty('--lab-color',colors[i]);b.onclick=()=>switchLab(lab).catch(showError);$('labs').append(b)}
+for (const [index, lab] of names.entries()) {
+ const button = document.createElement('button');
+ button.textContent = title(lab);
+ button.dataset.lab = lab;
+ button.style.setProperty('--lab-color', colors[index]);
+ button.onclick = () => switchLab(lab).catch(showError);
+ $('labs').append(button);
+ controlHelp.registerLabTab(button, lab);
+}
 window.addEventListener('message',e=>{if(e.origin!==location.origin)return;const rec=records.get(active);if(e.source!==rec?.frame.contentWindow)return;if(e.data?.hub==='activity'){renderControls();return;}if(e.data?.hub==='play'){togglePlay();return;}if(e.data?.hub==='changed'&&ready&&!session.job){const snap=rec.frame.contentWindow.hubBridge.snapshot(),key=signature(snap);if(key!==rec.signature){rec.signature=key;workspace.byLab[active]=snap;const processing=signature({spec:rec.frame.contentWindow.hubBridge.spec(),asset:snap.extra?.impulseRevision}),changed=processing!==rec.processingSignature;rec.processingSignature=processing;if(changed)dirty=true;saveWorkspace();fitEditor();if(changed){session.touch();session.status='Live settings updated';session.emit();}else renderControls();}}});
 function currentSpec(){const spec=currentBridge().spec();if(active==='granular')spec.sourceChannel=granularSourceMode($('grain-channel').value);return spec;}
 async function run(){const blocked=eligibility();if(blocked){showError(new Error(blocked));return false;}await stopPlayback();await currentBridge()?.prepareOutput?.();saveWorkspace();return session.run(active,currentSpec(),workspace,false);}
@@ -243,7 +255,18 @@ if(['localhost','127.0.0.1','[::1]'].includes(location.hostname)&&new URLSearchP
 
 function applySharedTool(tool){if(ready){currentBridge()?.setEditingTool(tool||'pen');saveWorkspace();const rec=records.get(active);if(rec)rec.signature=signature(currentBridge().snapshot());}}
 for(const [id,tool]of [['source-pen','pen'],['source-eraser','eraser']])$(id).onclick=()=>sourceUI.setTool(sourceUI.tool===tool?null:tool);
-connectHubHelp($('hub-info'),$('hub-info-button'));
+function refreshExportTitle(stage) {
+ const template = tooltipLanguage.text('hub.exportStage', 'Download saved stage: {stage}. Uncommitted changes excluded.');
+ $('export').title = stage ? template.replace('{stage}', () => stage.label)
+   : tooltipLanguage.text('hub.export', 'Download the selected saved stage as WAV. Unsaved edits are excluded.');
+}
+tooltipLanguage.subscribe(() => {
+ const view = session.view();
+ refreshExportTitle(view.current);
+ refreshSavedHistoryTitles($('history'), view);
+ draw();
+});
+connectHubHelp($('hub-info'),$('hub-info-button'), code => void tooltipLanguage.select(code));
 
 function paintStatus(message,busy=false){const text=message==='Input ready'?'':message;$('status').textContent=text;$('status').closest('.status-line').hidden=!text&&!busy;}
 
