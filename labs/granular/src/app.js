@@ -1152,15 +1152,19 @@ sourceCanvas.addEventListener("pointerdown", (event) => {
   sourceCanvas.setPointerCapture(event.pointerId);
 });
 
-sourceCanvas.addEventListener("pointermove", (event) => {
+function updateSourceWindowFromPointer(event) {
   if (!sourceDragging) return;
   const pointer = pointerToSourceNorm(event);
   if (Math.abs(pointer - sourceDragAnchor) < 0.008 && !sourceDragMoved) return;
   sourceDragMoved = true;
   setSourceWindowFromDrag(sourceDragAnchor, pointer);
-});
+}
+
+sourceCanvas.addEventListener("pointermove", updateSourceWindowFromPointer);
 
 sourceCanvas.addEventListener("pointerup", (event) => {
+  // A quick drag can reach its final coordinate without a matching pointermove.
+  if (embeddedInHub) updateSourceWindowFromPointer(event);
   sourceDragging = false;
   sourceCanvas.releasePointerCapture(event.pointerId);
 });
