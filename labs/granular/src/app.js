@@ -17,6 +17,7 @@ import {
 import { OutputMeterAnalyzer } from "./output-meter.js?v=20260930-01";
 
 const sourceLoadGate = createSourceLoadGate();
+const embeddedInHub = window.parent !== window && new URLSearchParams(location.search).get("hub") === "1";
 
 const fileInput = document.getElementById("fileInput");
 const fileStatus = document.getElementById("fileStatus");
@@ -366,6 +367,7 @@ async function decodeAudioFile(arrayBuffer) {
 }
 
 function buildWaveform(audioBuffer) {
+  if (embeddedInHub) return;
   waveform=summarizeChannels([audioBuffer.getChannelData(0)])[0];sourceColors=null;sourceRaster=null;
   analyzeSourceColors({length:audioBuffer.length,sampleRate:audioBuffer.sampleRate,numberOfChannels:1,getChannelData:()=>audioBuffer.getChannelData(0)},colors=>{if(buffer===audioBuffer){sourceColors=colors;drawSourceWindow();}});
 }
@@ -650,7 +652,7 @@ function drawSourceWindow() {
   sourceCtx.fillStyle = "rgba(170, 188, 204, 0.82)";
   sourceCtx.textAlign = "left";
   sourceCtx.fillText("Source", 7, 10);
-  paintToneLegend(sourceCtx,w,14);
+  if (!embeddedInHub) paintToneLegend(sourceCtx,w,14);
 }
 
 function sourceWindowDisplayBounds(left, width) {

@@ -49,7 +49,9 @@ async function getFrame(lab){
   const fail=error=>{if(settled)return;settled=true;clearInterval(timer);clearTimeout(timeout);if(records.get(lab)===rec)records.delete(lab);frame.remove();reject(error);};
   const finish=()=>{if(settled)return;try{const bridge=frame.contentWindow?.hubBridge;if(!bridge)return;const defaults=bridge.defaults();frame.contentDocument.body.dataset.hubLab=lab;rec.defaults=defaults;settled=true;clearInterval(timer);clearTimeout(timeout);resolve(rec);}catch(error){fail(new Error(title(lab)+' editor could not initialize: '+(error.message||String(error))));}};
   const timer=setInterval(finish,80),timeout=setTimeout(()=>fail(new Error(title(lab)+' editor did not load. Retry or select another Lab.')),45000);frame.onload=finish;
- });records.set(lab,rec);$('frames').append(frame);frame.src=`labs/${lab}/index.html?hub=1&shell=20261108-button-tone-b1`;return rec.promise;
+ });records.set(lab,rec);$('frames').append(frame);
+ const shellVersion=lab==='granular'?'20261108-granular-source1':'20261108-button-tone-b1';
+ frame.src=`labs/${lab}/index.html?hub=1&shell=${shellVersion}`;return rec.promise;
 }
 async function syncEditor(){
  editorLoadController?.abort();
