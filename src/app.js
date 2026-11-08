@@ -3,7 +3,8 @@ import {renderSavedHistory} from './history-ui.js?v=20261108-working-edits1';
 import {connectOutputMeter} from './output-meter-ui.js?v=20261107-shared-tools2';
 import {granularSourceMode} from './granular-source.js';
 import {NativeTransport} from './native-transport.js';
-import {HubSession} from './session.js?v=20261108-working-edits1';
+import {HubSession} from './session.js?v=20261108-relative-gain1';
+import {OUTPUT_GAIN_MIN_DB,OUTPUT_GAIN_MAX_DB} from './output-gain.js?v=20261108-relative-gain1';
 import {renderJob} from './renderer.js?v=20261106-level2';
 import {connectSourceEditor} from './source-ui.js?v=20261108-working-edits1';
 import {readAudioFile,validateAudioBuffer} from '../labs/audio/src/audio-import.js';
@@ -12,6 +13,20 @@ import {analyzeSourceColors} from '../labs/audio/src/source-colors.js';
 import {createSourceOverview} from '../labs/audio/src/source-overview.js';
 import {encodeWav} from '../labs/granular/src/granular-core.js';
 const $=id=>document.getElementById(id),names=['audio','timbre','space','granular','spectral','oscillator'],colors=['#91bde9','#e2cd83','#b99be9','#da9dbf','#e0a58a','#81cdbd'];
+const outputGain=$('output-gain');
+outputGain.min=String(OUTPUT_GAIN_MIN_DB);
+outputGain.max=String(OUTPUT_GAIN_MAX_DB);
+let outputGainStage=null;
+function updateOutputGain(){
+ const db=outputGain.valueAsNumber;
+ const value=db===0?'0 dB':`${db>0?'+':'−'}${Math.abs(db).toFixed(1)} dB`;
+ const position=(db-OUTPUT_GAIN_MIN_DB)/(OUTPUT_GAIN_MAX_DB-OUTPUT_GAIN_MIN_DB)*100;
+ $('output-gain-value').value=value;
+ outputGain.setAttribute('aria-valuetext',db===0?'0 dB, no adjustment':value);
+ outputGain.style.setProperty('--gain-start',`${Math.min(50,position)}%`);
+ outputGain.style.setProperty('--gain-end',`${Math.max(50,position)}%`);
+}
+outputGain.oninput=()=>{updateOutputGain();currentBridge()?.meter?.setGainDb(outputGain.valueAsNumber);};
 let active='audio',lastId=null,packet=null,peaks=[],colorsData=null,zoom=1,viewStart=0,waveHeight=180,frameHeight=430,ready=false,syncSerial=0,workspace={byLab:{},active:'audio',grainChannel:'mix'},dirty=false,assetLoading=false,editorFailure=null,sourceCursor=0,lastBusy=false,controlBlocked=true;
 let editorLoadController=null;
 const records=new Map();const session=new HubSession(renderJob,render);
@@ -34,7 +49,7 @@ async function getFrame(lab){
   const fail=error=>{if(settled)return;settled=true;clearInterval(timer);clearTimeout(timeout);if(records.get(lab)===rec)records.delete(lab);frame.remove();reject(error);};
   const finish=()=>{if(settled)return;try{const bridge=frame.contentWindow?.hubBridge;if(!bridge)return;const defaults=bridge.defaults();frame.contentDocument.body.dataset.hubLab=lab;rec.defaults=defaults;settled=true;clearInterval(timer);clearTimeout(timeout);resolve(rec);}catch(error){fail(new Error(title(lab)+' editor could not initialize: '+(error.message||String(error))));}};
   const timer=setInterval(finish,80),timeout=setTimeout(()=>fail(new Error(title(lab)+' editor did not load. Retry or select another Lab.')),45000);frame.onload=finish;
- });records.set(lab,rec);$('frames').append(frame);frame.src=`labs/${lab}/index.html?hub=1&shell=20261107-shared-tools2`;return rec.promise;
+ });records.set(lab,rec);$('frames').append(frame);frame.src=`labs/${lab}/index.html?hub=1&shell=20261108-relative-gain1`;return rec.promise;
 }
 async function syncEditor(){
  editorLoadController?.abort();
@@ -60,6 +75,8 @@ async function syncEditor(){
    if(saved&&!restoreBeforeLoad)bridge.restore(saved);
    bridge.setEditingTool(sourceUI.tool||'pen');
    if(lab==='granular')await bridge.routeSource(granularSourceMode(workspace.grainChannel));
+   if(token!==syncSerial)return;
+   bridge.meter?.setGainDb(outputGain.valueAsNumber);
    bridge.resize();
   });
   await rec.task;if(token!==syncSerial)return;
@@ -112,6 +129,8 @@ function render(v){if(v.activeJob&&!lastBusy)void stopPlayback();lastBusy=v.acti
 function eligibility(){const v=session.view();if(sourceUI.busy)return 'Applying source volume…';if(assetLoading)return 'Loading separate IR…';if(ready&&records.get(active)?.frame.contentWindow.hubBridge?.busy?.())return 'Preparing analysis or IR…';if(!ready)return editorFailure?.message||'Loading editor…';if(!v.current?.frames)return 'Open audio to begin';if(v.current.frames<4)return 'At least four source frames are required.';if(v.current.channels!==2)return 'Stereo input required; no automatic downmix.';const spec=records.get(active).frame.contentWindow.hubBridge.spec();if((spec.format&&spec.format!=='stereo')||(spec.settings?.format&&spec.settings.format!=='stereo'))return 'This integration currently supports stereo handoff. Choose Stereo 2ch.';if(active==='granular'&&!['mix','0','1'].includes($('grain-channel').value))return 'Choose Mono mix, Left or Right.';if(active==='oscillator'&&spec.settings.soundMode==='resynthesis'&&!spec.settings.analysisResult)return 'Analyzing current input…';return '';}
 function renderControls(){
  const v=session.view(),preparing=sourceUI.busy||assetLoading||Boolean(ready&&currentBridge()?.busy?.());
+ const stage=v.current?.id;
+ if(stage!==outputGainStage){outputGainStage=stage;outputGain.value=0;updateOutputGain();}
  sourceUI.render({...v,activeJob:v.activeJob||preparing});
  for(const rec of records.values()){const body=rec.frame.contentDocument?.body;if(body)body.inert=v.activeJob||preparing||!ready;}
  for(const b of $('history').querySelectorAll('button'))b.disabled=v.activeJob||preparing;
@@ -122,6 +141,7 @@ function renderControls(){
  $('file').disabled=preparing||v.activeJob;$('open-ir').disabled=preparing||v.activeJob;$('grain-channel').disabled=preparing||v.activeJob;
  for(const b of $('labs').children){b.setAttribute('aria-pressed',b.dataset.lab===active);b.disabled=v.activeJob||preparing;}
  let blocked='';try{blocked=eligibility();}catch(e){blocked=e.message;}
+ outputGain.disabled=v.activeJob||!!blocked;
  controlBlocked=!!blocked;const state=transport.state(),pending=!!transport.pending;
  $('play').disabled=!pending&&!state.playing&&(v.activeJob||!!blocked||state.busy||state.disabled);
  $('play').textContent=pending?'…':state.playing?'Ⅱ':'▶';
@@ -136,6 +156,7 @@ async function prepareTarget(lab,candidate,valid,signal){
  rec.task=rec.task.catch(()=>{}).then(async()=>{
   if(!valid())return;const bridge=rec.frame.contentWindow.hubBridge;
   rec.loadedId=null;await bridge.stop();bridge.restore(rec.defaults);
+  bridge.meter?.setGainDb(0);
   await bridge.load(candidate.packet,{signal});if(!valid())return;
   if(lab==='granular')await bridge.routeSource(granularSourceMode(candidate.workspace.grainChannel));
   if(!valid())return;bridge.resize();candidate.workspace.byLab[lab]=bridge.snapshot();rec.loadedId=candidate.id;
@@ -151,7 +172,7 @@ async function switchLab(lab){
  await stopPlayback();if(!sameInput())return false;
  await currentBridge().prepareOutput?.();if(!sameInput())return false;
  saveWorkspace();const spec=currentSpec();
- return session.handoff(from,spec,workspace,lab,(candidate,valid,signal)=>prepareTarget(lab,candidate,valid,signal));
+ return session.handoff(from,spec,workspace,lab,(candidate,valid,signal)=>prepareTarget(lab,candidate,valid,signal),{outputGainDb:outputGain.valueAsNumber});
 }
 for(const [i,lab]of names.entries()){const b=document.createElement('button');b.textContent=title(lab);b.dataset.lab=lab;b.style.setProperty('--lab-color',colors[i]);b.onclick=()=>switchLab(lab).catch(showError);$('labs').append(b)}
 window.addEventListener('message',e=>{if(e.origin!==location.origin)return;const rec=records.get(active);if(e.source!==rec?.frame.contentWindow)return;if(e.data?.hub==='activity'){renderControls();return;}if(e.data?.hub==='play'){togglePlay();return;}if(e.data?.hub==='changed'&&ready&&!session.job){const snap=rec.frame.contentWindow.hubBridge.snapshot(),key=signature(snap);if(key!==rec.signature){rec.signature=key;workspace.byLab[active]=snap;const processing=signature({spec:rec.frame.contentWindow.hubBridge.spec(),asset:snap.extra?.impulseRevision}),changed=processing!==rec.processingSignature;rec.processingSignature=processing;if(changed)dirty=true;saveWorkspace();fitEditor();if(changed){session.touch();session.status='Live settings updated';session.emit();}else renderControls();}}});

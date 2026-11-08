@@ -463,6 +463,7 @@ async function setupAudio() {
   node.connect(effectDryGain).connect(safetyLimiterNode);
   effectWetGain.connect(safetyLimiterNode);
   outputMeter = new OutputMeterAnalyzer(audioContext, { channelCount: 2 });
+  window.hubBridge?.meter?.attach(outputMeter);
   safetyLimiterNode.connect(outputGain).connect(outputMeter.input);
   outputMeter.connect(audioContext.destination);
   node.port.onmessage = (event) => {
@@ -1827,7 +1828,7 @@ const hubLevelLoadIR=window.hubBridge.loadIR;
 window.hubBridge.loadIR=async file=>{await hubLevelLoadIR(file);await hubPrepareLevel('convolution');};
 
 // Hub output display reads the existing analyser, without changing the signal path.
-import {createMeterTap} from '../../../src/hub-meter-tap.js?v=20261107-approved-ui2';
+import {createMeterTap} from '../../../src/hub-meter-tap.js?v=20261108-relative-gain1';
 window.hubBridge.meter=createMeterTap({analyser:()=>outputMeter,clipped:()=>meterClipLatched,setClipped:value=>{meterClipLatched=value;},eligible:()=>isPlaying&&!irBusy()});
 
 // Shared Hub toolbar delegates to the original point-tool setter.

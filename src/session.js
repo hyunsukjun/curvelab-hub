@@ -1,3 +1,4 @@
+import {applyOutputGain} from './output-gain.js?v=20261108-relative-gain1';
 import {VOLUME_MAX_GAIN,VOLUME_MAX_POINTS} from '../labs/audio/src/source-volume.js?v=20261028-volume-line1';
 import {initialEdit,lengthOf,deleteRange,setFade,materialize} from '../labs/audio/src/output-edit-core.js';
 const clone=x=>structuredClone(x),copy=p=>({...p,referenceBlob:undefined,channels:p.channels.map(c=>c.slice())});
@@ -17,7 +18,7 @@ export class HubSession{
  cancel(){if(!this.job)return;this.job.cancel?.();this.job=null;this.serial++;this.status='Cancelled · Current input retained';this.emit();}
  invalidate(){this.cancel();this.preview=null;this.revision++;}
  touch(){this.invalidate();this.status='Settings changed · Preview needs refresh';this.emit();}
- async validate(p,input=false){if(!p||!p.channels?.length||p.channels.length>8||p.sampleRate!==48000)throw new Error('Hub requires 48 kHz audio, 1–8 channels.');const n=p.channels[0].length;if(p.channels.some(c=>!(c instanceof Float32Array)||c.length!==n))throw new Error('Invalid channel data');if(n/48000>(input?180:660))throw new Error('Duration exceeds this Hub review build limit.');for(const c of p.channels)for(let i=0;i<n;i++)if(!Number.isFinite(c[i]))throw new Error('Invalid audio sample; previous input retained');}
+ async validate(p,input=false,{checkSamples=true}={}){if(!p||!p.channels?.length||p.channels.length>8||p.sampleRate!==48000)throw new Error('Hub requires 48 kHz audio, 1–8 channels.');const n=p.channels[0].length;if(p.channels.some(c=>!(c instanceof Float32Array)||c.length!==n))throw new Error('Invalid channel data');if(n/48000>(input?180:660))throw new Error('Duration exceeds this Hub review build limit.');if(checkSamples)for(const c of p.channels)for(let i=0;i<n;i++)if(!Number.isFinite(c[i]))throw new Error('Invalid audio sample; previous input retained');}
  capacity(node,deleted=[],edits=[]){
   const stages=[...this.nodes,...deleted.map(record=>record.stage)];if(node)stages.push(node);
   const buffers=new Set();
@@ -126,7 +127,7 @@ export class HubSession{
   }catch(e){if(this.job?.token!==token)return false;this.job=null;this.status=e.message;this.error=e.message;this.emit();return false;}
  }
  // Render and prepare the target while the previous stage remains authoritative.
- async handoff(lab,spec,workspace,target,prepareTarget){
+ async handoff(lab,spec,workspace,target,prepareTarget,{outputGainDb=0}={}){
   if(this.job||!this.current||!this.working.packet.channels[0].length)return false;
   this.current.workspace=clone(workspace);
   const input=this.current,revision=this.revision,token=++this.serial;
@@ -137,15 +138,28 @@ export class HubSession{
    controller.signal.addEventListener('abort',()=>job.cancel?.(),{once:true});
    if(controller.signal.aborted)job.cancel?.();
    const result=await job.promise;if(!valid())return false;
-   await this.validate(result);if(!valid())return false;
+   // The peak scan also rejects non-finite samples and can yield to cancellation.
+   await this.validate(result,false,{checkSamples:false});if(!valid())return false;
    if(result.channels.length!==2)throw new Error('Next Lab requires stereo; current stage retained.');
+   this.status='Checking output level…';this.progress=.85;this.emit();
+   const outputGain=await applyOutputGain(result.channels,outputGainDb,{signal:controller.signal});
+   if(!valid())return false;
    const nextWorkspace={active:target,byLab:{},grainChannel:workspace.grainChannel||'mix',dirtyByLab:{}};
    const candidate=this.make({...result,name:this.working.packet.name},lab[0].toUpperCase()+lab.slice(1)+' · '+(result.channels[0].length/48000).toFixed(2)+' s',input.id,nextWorkspace);
-   candidate.renderSpec={lab,spec:clone(spec)};this.capacity(candidate);
+   candidate.renderSpec={lab,spec:clone(spec)};
+   if(outputGain.requestedGainDb!==0||outputGain.limited)candidate.outputGain=outputGain;
+   this.capacity(candidate);
    this.status='Preparing '+target+'…';this.progress=.9;this.emit();
    await prepareTarget(candidate,valid,controller.signal);if(!valid())return false;
    this.publish(candidate);this.job=null;this.progress=1;
-   this.status=target[0].toUpperCase()+target.slice(1)+' ready · Previous stage retained';this.emit();return true;
+   this.status=target[0].toUpperCase()+target.slice(1)+' ready · Previous stage retained';
+   if(outputGain.skipped)this.status+=' · Output Gain skipped for near silence';
+   else if(candidate.outputGain){
+    const gain=outputGain.gainDb;
+    const peak=outputGain.outputPeakDb===null?'−∞':outputGain.outputPeakDb.toFixed(1);
+    this.status+=` · Output Gain ${gain>0?'+':''}${gain.toFixed(1)} dB${outputGain.limited?' (limited)':''} · Peak ${peak} dBFS`;
+   }
+   this.emit();return true;
   }catch(e){if(!valid())return false;this.job=null;this.error=e.message;this.status=e.message;this.emit();return false;}
  }
  async run(lab,spec,workspace,apply){if(this.job||!this.current||!this.working.packet.channels[0].length)return false;this.current.workspace=clone(workspace);const input=this.current,revision=this.revision,token=++this.serial;this.job={token};this.progress=0;this.error='';this.status=apply?'Applying…':'Preparing preview…';this.emit();const valid=()=>this.job?.token===token&&this.current===input&&this.revision===revision;try{const job=this.renderer(lab,this.packet(),clone(spec),p=>{if(valid()){this.progress=p;this.emit();}});this.job.cancel=job.cancel;const result=await job.promise;if(!valid())return false;await this.validate(result);if(!valid())return false;if(apply){const candidate=this.make(result,`${lab[0].toUpperCase()+lab.slice(1)} · ${result.channels[0].length/48000>=60?'':(result.channels[0].length/48000).toFixed(2)+' s'}`,input.id);candidate.renderSpec={lab,spec:clone(spec)};this.publish(candidate);this.status='Applied · Result is the next input';}else{this.preview={packet:copy(result),inputId:input.id,revision,lab,spec:clone(spec)};this.status='Preview ready · Input unchanged';}this.job=null;this.emit();return true;}catch(e){if(!valid())return false;this.job=null;this.error=e.message;this.status=e.message;this.emit();return false;}}

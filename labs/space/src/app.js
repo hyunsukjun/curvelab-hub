@@ -465,6 +465,7 @@ function getAudioContext() {
 function getOutputMeter(context) {
   if (!outputMeter) {
     outputMeter = new OutputMeterAnalyzer(context, { channelCount: 2 });
+    window.hubBridge?.meter?.attach(outputMeter);
     outputMeter.connect(context.destination);
     startMeterAnimation();
   }
@@ -1607,7 +1608,7 @@ const hubStereoDefaults=window.hubBridge.defaults;
 window.hubBridge.defaults=()=>{const s=hubStereoDefaults();if(s.dom?.renderFormat)s.dom.renderFormat.value='stereo';return s;};
 
 // Hub output display reads the existing analyser, without changing the signal path.
-import {createMeterTap} from '../../../src/hub-meter-tap.js?v=20261107-approved-ui2';
+import {createMeterTap} from '../../../src/hub-meter-tap.js?v=20261108-relative-gain1';
 window.hubBridge.meter=createMeterTap({analyser:()=>outputMeter,clipped:()=>meterClipLatched,setClipped:value=>{meterClipLatched=value;}});
 
 // Shared Hub toolbar delegates to the original point-tool setter.
