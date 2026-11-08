@@ -54,7 +54,7 @@ async function getFrame(lab){
   const finish=()=>{if(settled)return;try{const bridge=frame.contentWindow?.hubBridge;if(!bridge)return;const defaults=bridge.defaults();frame.contentDocument.body.dataset.hubLab=lab;controlHelp.connectLab(frame,lab,labTooltipCopy[lab]);rec.defaults=defaults;settled=true;clearInterval(timer);clearTimeout(timeout);resolve(rec);}catch(error){fail(new Error(title(lab)+' editor could not initialize: '+(error.message||String(error))));}};
   const timer=setInterval(finish,80),timeout=setTimeout(()=>fail(new Error(title(lab)+' editor did not load. Retry or select another Lab.')),45000);frame.onload=finish;
  });records.set(lab,rec);$('frames').append(frame);
- const shellVersion=lab==='granular'?'20261108-granular-pointerup1':'20261108-button-tone-b1';
+ const shellVersion=lab==='granular'?'hub-source-waveform1':'20261108-button-tone-b1';
  frame.src=`labs/${lab}/index.html?hub=1&shell=${shellVersion}`;return rec.promise;
 }
 async function syncEditor(){

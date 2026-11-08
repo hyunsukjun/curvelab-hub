@@ -12,11 +12,11 @@ export function summarizeChannels(channels, buckets=16000) {
 }
 
 import {toneColor} from './source-colors.js';
-export function paintEnvelope(ctx,lane,spectrum,left,width,mid,amplitude,scale,referencePeak){
-  if(!spectrum)return; // Wait for color analysis; no legacy waveform flash.
+export function paintEnvelope(ctx,lane,spectrum,left,width,mid,amplitude,scale,referencePeak,solidColor=null){
+  if(!spectrum&&!solidColor)return; // Wait for color analysis unless the caller requests a solid waveform.
   if(!lane?.length)return;
-  ctx.fillStyle='#8bc9ff';
-  if(spectrum?.length){const gradient=ctx.createLinearGradient(left,0,left+width,0),n=Math.max(2,Math.min(256,spectrum.length));
+  ctx.fillStyle=solidColor||'#8bc9ff';
+  if(!solidColor&&spectrum?.length){const gradient=ctx.createLinearGradient(left,0,left+width,0),n=Math.max(2,Math.min(256,spectrum.length));
     for(let i=0;i<n;i++){const t=i/(n-1);gradient.addColorStop(t,toneColor(spectrum[Math.min(spectrum.length-1,Math.floor(t*spectrum.length))]));}ctx.fillStyle=gradient;}
   const columns=Math.max(1,Math.ceil(width*scale)),hi=new Float32Array(columns),lo=new Float32Array(columns),gain=amplitude/Math.max(.00001,referencePeak);
   for(let x=0;x<columns;x++){const a=Math.floor(x/columns*lane.length),b=Math.min(lane.length,Math.max(a+1,Math.ceil((x+1)/columns*lane.length)));let mn=0,mx=0;for(let i=a;i<b;i++){mn=Math.min(mn,lane.minimum[i]);mx=Math.max(mx,lane.maximum[i]);}hi[x]=mid-mx*gain;lo[x]=mid-mn*gain;}

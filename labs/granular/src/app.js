@@ -2,7 +2,7 @@ import {createSourceLoadGate, fetchDefaultSource} from "./default-source.js?v=20
 import {beginVerticalGroup, moveVerticalGroup, restoreVerticalGroup, verticalGroupSuffix, drawVerticalGroupRing} from "./curve-group-edit.js?v=20261027-shift1";
 import {canvasAxisWidth, drawEditorGrid, frequencyTicks, frequencyLabel, spacedMarks, canvasLabelFont} from "./canvas-grid.js?v=20261026-graphite1";
 import {analyzeSourceColors} from "./source-colors.js";
-import {summarizeChannels,paintEnvelope,peakOf,paintToneLegend} from "./source-envelope.js";
+import {summarizeChannels,paintEnvelope,peakOf,paintToneLegend} from "./source-envelope.js?v=hub-source-waveform1";
 import {mountTransport} from "./common-transport.js?v=20261013-1";
 import { readAudioFile, validateAudioBuffer } from "./audio-import.js?v=20261029-input-validation1";
 import {
@@ -367,8 +367,13 @@ async function decodeAudioFile(arrayBuffer) {
 }
 
 function buildWaveform(audioBuffer) {
+  sourceColors = null;
+  sourceRaster = null;
+  // In the Hub, show the routed mono source after the initial stereo load.
+  waveform = embeddedInHub && audioBuffer.numberOfChannels !== 1
+    ? []
+    : summarizeChannels([audioBuffer.getChannelData(0)])[0];
   if (embeddedInHub) return;
-  waveform=summarizeChannels([audioBuffer.getChannelData(0)])[0];sourceColors=null;sourceRaster=null;
   analyzeSourceColors({length:audioBuffer.length,sampleRate:audioBuffer.sampleRate,numberOfChannels:1,getChannelData:()=>audioBuffer.getChannelData(0)},colors=>{if(buffer===audioBuffer){sourceColors=colors;drawSourceWindow();}});
 }
 
@@ -630,7 +635,7 @@ function drawSourceWindow() {
   const key=`${w}:${h}:${scale}:${plot.left}:${plot.width}`;
   if(!sourceRaster||sourceRaster.key!==key||sourceRaster.waveform!==waveform||sourceRaster.colors!==sourceColors){
     const image=document.createElement('canvas');image.width=Math.ceil(w*scale);image.height=Math.ceil(h*scale);const c=image.getContext('2d');c.setTransform(scale,0,0,scale,0,0);c.fillStyle='#191c20';c.fillRect(0,0,w,h);drawCanvasGrid(c,plot.left,plot.width,h);
-    paintEnvelope(c,waveform,sourceColors?.[0],plot.left,plot.width,h*.52,h*.34,scale,peakOf([waveform]));
+    paintEnvelope(c,waveform,sourceColors?.[0],plot.left,plot.width,h*.52,h*.34,scale,peakOf([waveform]),embeddedInHub ? '#8faebf' : null);
     sourceRaster={key,waveform,colors:sourceColors,image};
   }
   sourceCtx.setTransform(1,0,0,1,0,0);sourceCtx.clearRect(0,0,sourceCtx.canvas.width,sourceCtx.canvas.height);sourceCtx.drawImage(sourceRaster.image,0,0);sourceCtx.setTransform(scale,0,0,scale,0,0);
