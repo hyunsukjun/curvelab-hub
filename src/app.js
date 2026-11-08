@@ -184,7 +184,9 @@ async function stopPlayback(){await transport.stop();}
 function togglePlay(){if(!session.job&&!$('hub-info').open)void transport.toggle();}
 $('play').onclick=togglePlay;$('rewind').onclick=()=>void transport.seek(0);$('seek').oninput=()=>void transport.seek(Number($('seek').value)/1000);
 function updateTransport(){
- const state=transport.state();$('clock').textContent=`${fmt(state.seconds||0)} / ${fmt(state.duration||0)}`;
+ const state=transport.state();
+ $('clock-elapsed').textContent=fmt(state.seconds||0);
+ $('clock-duration').textContent=fmt(state.duration||0);
  const seek=$('seek');
  seek.value=state.duration?state.seconds/state.duration*1000:0;
  seek.style.setProperty('--range-progress',`${Number(seek.value)/10}%`);
