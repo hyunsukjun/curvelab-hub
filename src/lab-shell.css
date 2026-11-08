@@ -21,6 +21,7 @@ body[data-hub-lab="audio"] .canvasFrame{display:block!important;height:auto!impo
 
 /* Embedded Lab chrome uses the Hub surface and a single, outer content rail. */
 :root{--lab-content-inset:0px!important}
+body[data-hub-lab]{--cl-surface-control:#393e46;--cl-edge-rest:#505660}
 .app{padding:0 0 8px!important}
 .app,.editor,.workspace,.curveStack,.legend,.effectBar,.parameterBar,.currentValues,.durationPanel,.roomControls,.controlBand,.sourceBand,.impulseBand,.modulationInfo,.chainDiagram,.spatialPanel{background:#30353c!important}
 .editor>.legend,.editor>.effectBar,.editor>.parameterBar,.editor>.currentValues,.editor>.durationPanel,.editor>.roomControls,.editor>.sourceBand,.editor>.controlBand,.editor>.impulseBand,.editor>.modulationInfo,.editor>.chainDiagram{padding-inline:0!important}
