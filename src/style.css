@@ -119,7 +119,11 @@ main>.status-line{padding-inline:calc(var(--hub-rail-safe) + var(--hub-scrollbar
 #wave[data-volume-editing="true"][data-volume-tool="eraser"]{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='m4 17 9-12q2-2 4 0l4 4q2 2 0 4l-8 8H8Z' fill='%23edf4fb' stroke='%23191c20' stroke-width='1.5'/%3E%3Cpath d='m6 13 8 8' stroke='%23191c20' stroke-width='1.5'/%3E%3C/svg%3E") 5 18,crosshair}
 #hub-info-button.info-button{width:30px;height:30px;min-height:30px;border:1px solid #65717d;border-radius:50%;padding:0;font:600 14px Georgia,serif;display:inline-flex;align-items:center;justify-content:center;background:transparent}
 #hub-info{width:min(600px,94vw);max-height:82dvh;overflow:auto;padding:18px;background:#30353c;color:#e2e7ed;font-size:12px;line-height:1.6}
-#hub-info .info-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
+#hub-info:lang(ko){word-break:keep-all;overflow-wrap:anywhere}
+#hub-info .info-heading{display:flex;align-items:center;justify-content:space-between;gap:8px 16px;flex-wrap:wrap}
+#hub-info .info-actions{display:flex;align-items:center;gap:8px;max-width:100%;margin-left:auto}
+#hub-info-language{min-width:0;max-width:100%;font-size:13px;min-height:30px}
+@media(pointer:coarse){#hub-info-language,#hub-info-close{min-height:44px}}
 #hub-info h2{font-size:16px}#hub-info h3{font-size:13px;margin:16px 0 5px}
 #hub-info dl{display:grid;grid-template-columns:minmax(100px,.35fr) minmax(0,1fr);gap:6px 16px;margin:0}
 #hub-info dt{color:#e2e7ed;font-weight:500}#hub-info dd{margin:0;color:#becbd7}

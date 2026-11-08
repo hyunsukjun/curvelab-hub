@@ -1,3 +1,4 @@
+import {connectHubHelp} from './help-ui.js?v=20261108-help-languages1';
 import {renderSavedHistory} from './history-ui.js?v=20261108-working-edits1';
 import {connectOutputMeter} from './output-meter-ui.js?v=20261107-shared-tools2';
 import {granularSourceMode} from './granular-source.js';
@@ -215,8 +216,7 @@ if(['localhost','127.0.0.1','[::1]'].includes(location.hostname)&&new URLSearchP
 
 function applySharedTool(tool){if(ready){currentBridge()?.setEditingTool(tool||'pen');saveWorkspace();const rec=records.get(active);if(rec)rec.signature=signature(currentBridge().snapshot());}}
 for(const [id,tool]of [['source-pen','pen'],['source-eraser','eraser']])$(id).onclick=()=>sourceUI.setTool(sourceUI.tool===tool?null:tool);
-$('hub-info-button').onclick=()=>$('hub-info').showModal();
-$('hub-info-close').onclick=()=>$('hub-info').close();
+connectHubHelp($('hub-info'),$('hub-info-button'));
 
 function paintStatus(message,busy=false){const text=message==='Input ready'?'':message;$('status').textContent=text;$('status').closest('.status-line').hidden=!text&&!busy;}
 
