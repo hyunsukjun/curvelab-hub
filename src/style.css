@@ -31,7 +31,7 @@ main>.status-line{flex:0 0 auto;max-height:6em;overflow:auto;min-width:0}
 
 /* One symmetric rail for source, Lab content and playback. */
 :root{--hub-surface:#30353c;--hub-rail-safe:6px;--hub-control-fill:#393e46;--hub-control-edge:#505660}
-:is(#export,#undo-edit,#redo-edit,#delete,#grain-channel,#retry-editor,#open-ir,#cancel,#volume-reset),
+:is(#export,#undo-edit,#redo-edit,#delete,#grain-channel,#retry-editor,#open-ir,#cancel,#volume-reset,#continue-output),
 #workspace-content>header .file,.transport>button:not(.playing),#labs button[aria-pressed="false"]{
  background-color:var(--hub-control-fill);border-color:var(--hub-control-edge);
 }
@@ -97,8 +97,11 @@ main>.status-line{padding-inline:calc(var(--hub-rail-safe) + var(--hub-scrollbar
 #import-error{margin:0 0 8px;padding:6px 10px;background:#452e32;color:#ffd9da;overflow-wrap:anywhere}
 
 /* Saved stages share the same stem at their actual point of origin. */
-.history-band{margin:2px 0 8px;min-width:0}
-#history{--stage-row-height:28px;--stage-row-gap:6px;--stage-elbow:8px;--stage-connector:#778592;min-width:0;overflow-x:auto;padding:4px 0}
+.history-band{display:flex;align-items:flex-start;flex-wrap:wrap;gap:4px 10px;margin:2px 0 8px;min-width:0}
+.history-band:has(#continue-output:not([hidden])) #history:empty{display:none}
+#continue-output{margin-block-start:4px;margin-inline-start:auto;max-width:100%}
+@media(pointer:fine){#continue-output{min-height:28px;padding:3px 8px}}
+#history{--stage-row-height:28px;--stage-row-gap:6px;--stage-elbow:8px;--stage-connector:#778592;flex:1 1 18rem;min-width:0;overflow-x:auto;padding:4px 0}
 .history-trees,.history-branches{list-style:none;margin:0;padding:0;width:max-content;display:grid;row-gap:var(--stage-row-gap)}
 .history-trees{padding-inline-end:4px}
 .history-node{position:relative;display:flex;align-items:flex-start}
@@ -117,6 +120,7 @@ main>.status-line{padding-inline:calc(var(--hub-rail-safe) + var(--hub-scrollbar
 
 #draft-state{border:1px solid #8292a0;border-radius:10px;padding:0 8px;font-size:10px;color:#d9e2eb}
 .route{justify-content:flex-start;gap:10px}
+#input-provenance{color:#dce5ec;min-width:0;overflow-wrap:anywhere}
 .route #granular-route,.route #open-ir{margin-left:auto}
 .source .actions .hub-help-anchor{display:inline-flex}
 .source .actions .hub-help-anchor:has(> :is(#undo-edit,#delete)){margin-left:8px}

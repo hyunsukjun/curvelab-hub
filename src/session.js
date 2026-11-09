@@ -8,6 +8,7 @@ export class HubSession{
  view(){
   const n=this.current,w=this.working;
   return {current:n?{id:n.id,inputId:w.id,label:n.label,kind:n.kind,parentId:n.parentId,frames:w.packet.channels[0].length,sampleRate:w.packet.sampleRate,channels:w.packet.channels.length}:null,
+   inputLabel:this.inputLabel,
    edit:w?.editState?{selection:clone(w.selection),fadeIn:w.editState.fadeIn,fadeOut:w.editState.fadeOut,volume:clone(w.editState.volume),rate:w.editState.rate,canUndo:!!this.undoEdits.length,canRedo:!!this.redoEdits.length,modified:w.editState!==this.editBase.editState}:null,
    history:this.nodes.map(n=>({id:n.id,label:n.label,parentId:n.parentId,lab:this.stageLab(n)})),activeJob:!!this.job,status:this.status,error:this.error,progress:this.progress,revision:this.revision,restoreCount:this.restoreCount,preview:!!this.preview};
  }
@@ -41,6 +42,12 @@ export class HubSession{
   this.nodes.push(n);this.resetWorking(n);this.preview=null;this.revision++;}
  get editBase(){return this.reopened?.recipe||this.current;}
  get baseInputId(){return this.reopened?`${this.current.id}:input`:this.current?.id;}
+ get inputLabel(){
+  if(this.reopened)return this.reopened.recipe.inputLabel||this.reopened.recipe.packet.name||'Source audio';
+  if(!this.current)return '';
+  const lab=this.current.renderSpec?.lab;
+  return lab?lab[0].toUpperCase()+lab.slice(1)+' output':'Original audio';
+ }
  get editorWorkspace(){return (this.reopened||this.current)?.workspace;}
  rememberWorkspace(workspace){if(this.current)(this.reopened||this.current).workspace=clone(workspace);}
  resetWorking(n,reopen=false){
@@ -151,12 +158,12 @@ export class HubSession{
   }finally{signal.removeEventListener('abort',cancel);}
  }
  // Prepare the target while the current work remains authoritative. A null spec passes the working audio through.
- async handoff(lab,spec,workspace,target,prepareTarget,{outputGainDb=0,restoreId=null,prepared=null}={}){
+ async handoff(lab,spec,workspace,target,prepareTarget,{outputGainDb=0,restoreId=null,prepared=null,continueOutput=false}={}){
   const restoreStage=restoreId===null?null:this.nodes.find(node=>node.id===restoreId);
   if(this.job||!this.current||!this.working.packet.channels[0].length)return false;
   if(restoreId!==null&&(!restoreStage||!spec))return false;
   this.rememberWorkspace(workspace);
-  const input=this.current,working=this.working,reopened=this.reopened,recipeWorkspace=this.editorWorkspace;
+  const input=this.current,working=this.working,reopened=this.reopened,recipeWorkspace=this.editorWorkspace,inputLabel=this.inputLabel;
   const revision=this.revision,token=++this.serial;
   const controller=new AbortController();this.job={token,cancel:()=>controller.abort()};this.progress=0;this.error='';this.status=restoreStage?'Saving '+lab+'…':spec?'Processing '+lab+' → '+target+'…':'Preparing '+target+'…';this.emit();
   const valid=()=>this.job?.token===token&&this.current===input&&this.working===working&&this.revision===revision;
@@ -169,6 +176,7 @@ export class HubSession{
     if(!valid())return false;
     input.workspace=nextWorkspace;
     if(reopened)this.resetWorking(input);
+    if(continueOutput)this.restoreCount++;
     this.preview=null;this.revision++;
     this.job=null;this.progress=1;this.status=target[0].toUpperCase()+target.slice(1)+' ready · Working audio retained';
     this.emit();return true;
@@ -184,7 +192,7 @@ export class HubSession{
    const candidate=this.make({...result,name:working.packet.name},lab[0].toUpperCase()+lab.slice(1)+' · '+(result.channels[0].length/48000).toFixed(2)+' s',parentId,nextWorkspace);
    candidate.renderSpec={lab,spec:clone(spec)};
    // The working input is immutable here. Keep it even if its parent is deleted.
-   candidate.recipe={packet:working.packet,editState:working.editState,workspace:recipeWorkspace,outputGainDb};
+   candidate.recipe={packet:working.packet,editState:working.editState,workspace:recipeWorkspace,outputGainDb,inputLabel};
    if(outputGain.requestedGainDb!==0||outputGain.limited)candidate.outputGain=outputGain;
    this.capacity(candidate);
    if(!restoreStage){

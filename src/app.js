@@ -1,4 +1,4 @@
-import {connectHubHelp} from './help-ui.js?v=hub-chain-branch1';
+import {connectHubHelp} from './help-ui.js?v=hub-continue-output1';
 import {createControlHelp} from './control-help.js?v=hub-chain-branch1';
 import {tooltipLanguage} from './tooltip-language.js?v=hub-chain-branch1';
 import {labTooltipCopy} from './lab-tooltip-copy.js?v=20261108-english-help1';
@@ -9,7 +9,7 @@ import {NativeTransport} from './native-transport.js';
 import {PCMPlayer} from './player.js?v=hub-chain-branch1';
 import {findSourceSeek} from '../labs/audio/src/source-seek.js';
 import {fadeOutput} from '../labs/audio/src/playback-boundary.js';
-import {HubSession} from './session.js?v=hub-chain-branch1';
+import {HubSession} from './session.js?v=hub-continue-output1';
 import {OUTPUT_GAIN_MIN_DB,OUTPUT_GAIN_MAX_DB} from './output-gain.js?v=20261108-relative-gain1';
 import {renderJob} from './renderer.js?v=20261106-level2';
 import {connectSourceEditor} from './source-ui.js?v=hub-chain-branch1';
@@ -68,9 +68,8 @@ const auditionBridge={
   },
   async play(){
    const token=++transportSerial;
-   await player.unlock();
-   if(token!==transportSerial)return;
-   const {packet}=await prepareAudition();
+   // Capture the current settings while the audio device starts.
+   const [,{packet}]=await Promise.all([player.unlock(),prepareAudition()]);
    await transportStop;
    if(token!==transportSerial)return;
    if(player.packet!==packet)player.set(packet,Math.min(packet.channels[0].length,Math.round(outputPosition*48000)));
@@ -263,7 +262,12 @@ function renderControls(){
  $('seek').disabled=$('rewind').disabled=(pending&&!transport.pausing)||v.activeJob||!!blocked||state.busy;
  $('export').disabled=exporting||v.activeJob||(!usesSavedOutput()&&!!blocked)||!session.current?.packet.channels[0].length;refreshExportTitle();$('draft-state').hidden=!dirty||!ready;$('granular-route').hidden=active!=='granular';
  let mode='';if(ready&&active==='oscillator')mode=currentBridge().spec().settings.soundMode;$('open-ir').hidden=mode!=='convolution';
- $('lab-status').textContent=blocked||(session.reopened?`Editing ${v.current.label} · Waveform shows its input`:active==='granular'?`Grain source: ${$('grain-channel').selectedOptions[0]?.textContent||'Mono mix'}`:active==='oscillator'?(mode==='resynthesis'?'File Resynthesis':'Oscillator + File IR'):active==='space'?'Stereo output':'');
+ $('input-provenance').hidden=!v.inputLabel;
+ $('input-provenance').textContent=v.inputLabel?`Input · ${v.inputLabel}`:'';
+ const continueButton=$('continue-output');
+ continueButton.hidden=!v.current||(!session.reopened&&!dirty);
+ continueButton.disabled=v.activeJob||switching||!!blocked;
+ $('lab-status').textContent=blocked||(session.reopened?`Editing ${v.current.label}`:active==='oscillator'?(mode==='resynthesis'?'File Resynthesis':'Oscillator + File IR'):active==='space'?'Stereo output':'');
 }
 async function prepareTarget(lab,candidate,valid,signal){
  const rec=await getFrame(lab);if(!valid())return;
@@ -363,8 +367,8 @@ async function leaveLab(transition){
    }
   }
   saveWorkspace();
-  return transition(from,saveStage?currentSpec():null,outputGainDb);
- }finally{switching=false;}
+  return await transition(from,saveStage?currentSpec():null,outputGainDb);
+ }finally{switching=false;renderControls();}
 }
 async function switchLab(lab){
  if(!names.includes(lab))throw new Error('Unknown Lab');
@@ -391,6 +395,26 @@ async function selectSavedStage(id){
   return session.restore(id);
  });
 }
+async function continueFromOutput(){
+ const button=$('continue-output'),hadFocus=document.activeElement===button;
+ return leaveLab(async(lab,spec,outputGainDb)=>{
+  if(!ready||(!session.reopened&&!spec))return false;
+  let reusedEditor=false;
+  const moved=await session.handoff(lab,spec,workspace,lab,(candidate,valid,signal)=>{
+   reusedEditor=true;
+   ready=false;
+   return prepareTarget(lab,candidate,valid,signal);
+  },{outputGainDb,prepared:spec?matchingOutput(spec):null,continueOutput:true});
+  if(!moved&&reusedEditor){
+   // Preparing the next input reused the current iframe. Restore its previous draft on failure or cancellation.
+   records.get(lab).loadedId=null;
+   await syncEditor();
+  }
+  if(moved&&hadFocus&&(document.activeElement===button||document.activeElement===document.body))$('wave').focus({preventScroll:true});
+  return moved;
+ });
+}
+$('continue-output').onclick=()=>continueFromOutput().catch(showError);
 for (const [index, lab] of names.entries()) {
  const button = document.createElement('button');
  button.textContent = title(lab);
@@ -458,7 +482,7 @@ function updateTransport(){
 }
 connectOutputMeter($('output-meter'),()=>ready&&!session.job?auditionBridge:null);
 setInterval(updateTransport,100);
-window.addEventListener('keydown',e=>{if($('hub-info').open||e.target.closest?.('#hub-info-button'))return;if(e.code==='Space'&&!e.target.matches('input,select,textarea,summary')&&!e.target.isContentEditable){e.preventDefault();if(!e.repeat)togglePlay();}});
+window.addEventListener('keydown',e=>{if($('hub-info').open||e.target.closest?.('#hub-info-button,#continue-output'))return;if(e.code==='Space'&&!e.target.matches('input,select,textarea,summary')&&!e.target.isContentEditable){e.preventDefault();if(!e.repeat)togglePlay();}});
 async function decode(file){const bytes=await readAudioFile(file,48000),ctx=new OfflineAudioContext(2,1,48000),b=await ctx.decodeAudioData(bytes);await validateAudioBuffer(b);if(![1,2].includes(b.numberOfChannels))throw new Error('Multichannel file: open a mono or stereo file. Previous audio retained.');const channels=Array.from({length:b.numberOfChannels},(_,i)=>{const c=new Float32Array(b.length);b.copyFromChannel(c,i);return c;});if(channels.length===1)channels.push(channels[0].slice());return {name:file.name,sampleRate:b.sampleRate,channels};}
 $('file').onchange=()=>{const f=$('file').files[0];if(f){saveWorkspace();stopPlayback();session.load(()=>decode(f));}$('file').value=''};function loadDefaultSample(){return session.load(async()=>{const r=await fetch('labs/audio/assets/audio/bach-prelude-72bpm.mp3');if(!r.ok)throw new Error('Sample unavailable');return decode(new File([await r.blob()],'Bach Prelude.mp3'));});}
 $('restore-original').onclick=()=>{
@@ -516,7 +540,7 @@ window.addEventListener('blur',cancelResize);
 // Coalesce layout work. Observe only available space and non-canvas chrome;
 // never feed the expanded Lab canvas height back into its own minimum.
 const layoutObserver=new ResizeObserver(fitEditor);
-for(const element of [$('workspace-scroll'),document.querySelector('header'),document.querySelector('.source .bar'),document.querySelector('.edit-controls'),$('edit-help'),$('history'),$('labs'),document.querySelector('.route')])layoutObserver.observe(element);
+for(const element of [$('workspace-scroll'),document.querySelector('header'),document.querySelector('.source .bar'),document.querySelector('.edit-controls'),$('edit-help'),document.querySelector('.history-band'),$('labs'),document.querySelector('.route')])layoutObserver.observe(element);
 new ResizeObserver(draw).observe($('wave'));
 window.addEventListener('resize',fitEditor);
 render(session.view());syncEditor();void loadDefaultSample();window.addEventListener('pagehide',()=>{editorLoadController?.abort();session.cancel();void stopPlayback();for(const r of records.values())void r.frame.contentWindow.hubBridge?.stop()});
