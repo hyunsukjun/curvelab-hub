@@ -229,7 +229,13 @@ export function createControlHelp() {
   });
   observe(document);
   for (const [selector, english] of Object.entries(sourceTooltipCopy)) {
-    registerText(document.querySelector(selector), `source.${selector.slice(1)}`, english);
+    const control = document.querySelector(selector);
+    const key = `source.${selector.slice(1)}`;
+    const shortcut = selector === '#zoom-in' ? '+' : selector === '#zoom-out' ? '−' : '';
+    register(control, () => {
+      const copy = tooltipLanguage.text(key, english);
+      return shortcut ? `${copy} (${shortcut})` : copy;
+    });
   }
   for (const [selector, [key, english]] of Object.entries(hubControlCopy)) {
     registerText(document.querySelector(selector), key, english);

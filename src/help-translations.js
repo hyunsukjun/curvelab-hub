@@ -13,6 +13,7 @@ export const helpTranslations = {
     ],
     source: [
       ["单击 / 拖动", "关闭工具时，单击可跳转到对应位置，拖动可选择一段音频。"],
+      ["+ / − / Fit", "将焦点移到 Edit Audio。按 +（或 =）放大，按 − 缩小。点击 Fit 显示完整波形。"],
       ["⌘ / Pencil", "按住 Command 或启用 Pencil 即可编辑音量。单击添加控制点，拖动移动控制点。范围为静音至 +6 dB，控制点之间以直线连接。"],
       ["Eraser / Option + 单击", "删除曲线中间的音量控制点。Windows 上使用 Alt + 单击。音频选区和端点受到保护。"],
       ["方向键 / Home", "编辑音量时，左、右方向键选择控制点，上、下方向键调整增益。按住 Shift 可进行微调。按 Home 将该点的增益恢复为 0 dB。"],
@@ -54,6 +55,7 @@ export const helpTranslations = {
     ],
     source: [
       ["Clic / glissement", "Lorsque les outils sont désactivés, cliquez pour déplacer la tête de lecture ou faites glisser pour sélectionner une zone."],
+      ["+ / − / Fit", "Placez le focus dans Edit Audio. Appuyez sur + (ou =) pour zoomer et sur − pour dézoomer. Cliquez sur Fit pour afficher toute la forme d’onde."],
       ["⌘ / Pencil", "Maintenez Commande enfoncée ou activez Pencil pour modifier le volume. Cliquez pour ajouter un point et faites-le glisser pour le déplacer. Du silence à +6 dB, avec des segments droits entre les points."],
       ["Eraser / Option + clic", "Supprime un point de volume intermédiaire. Sous Windows, utilisez Alt + clic. Les zones audio et les points d’extrémité sont protégés."],
       ["Touches fléchées / Début", "En mode volume, les flèches gauche et droite sélectionnent un point. Les flèches haut et bas règlent le gain. Maj affine le réglage. La touche Début ramène le point à 0 dB."],
@@ -95,6 +97,7 @@ export const helpTranslations = {
     ],
     source: [
       ["Klicken / Ziehen", "Bei ausgeschalteten Werkzeugen setzt ein Klick die Wiedergabeposition. Durch Ziehen wählen Sie einen Bereich aus."],
+      ["+ / − / Fit", "Setzen Sie den Fokus auf Edit Audio. Mit + (oder =) vergrößern Sie die Ansicht, mit − verkleinern Sie sie. Ein Klick auf Fit zeigt die gesamte Wellenform."],
       ["⌘ / Pencil", "Halten Sie zum Bearbeiten der Lautstärke die Befehlstaste gedrückt oder aktivieren Sie Pencil. Klicken fügt einen Punkt hinzu. Durch Ziehen verschieben Sie ihn. Der Bereich reicht von stumm bis +6 dB. Die Punkte sind durch gerade Linien verbunden."],
       ["Eraser / Wahltaste + Klick", "Löscht einen inneren Lautstärkepunkt. Unter Windows verwenden Sie Alt + Klick. Audiobereiche und Endpunkte sind geschützt."],
       ["Pfeiltasten / Pos1", "Im Lautstärkemodus wählen Links und Rechts einen Punkt aus. Auf und Ab ändern die Verstärkung. Mit Umschalt ist die Abstufung feiner. Pos1 setzt den Punkt auf 0 dB zurück."],
@@ -136,6 +139,7 @@ export const helpTranslations = {
     ],
     source: [
       ["Clic / trascinamento", "Con gli strumenti disattivati, fai clic per spostare la testina di riproduzione o trascina per selezionare una regione."],
+      ["+ / − / Fit", "Porta il focus su Edit Audio. Premi + (o =) per ingrandire e − per ridurre. Fai clic su Fit per vedere l’intera forma d’onda."],
       ["⌘ / Pencil", "Tieni premuto Comando o attiva Pencil per modificare il volume. Fai clic per aggiungere un punto e trascinalo per spostarlo. Dal silenzio a +6 dB, con segmenti rettilinei tra i punti."],
       ["Eraser / Opzione + clic", "Elimina un punto di volume intermedio. Su Windows usa Alt + clic. Le regioni audio e i punti alle estremità sono protetti."],
       ["Tasti freccia / Home", "In modalità volume, le frecce sinistra e destra selezionano un punto. Su e giù regolano il guadagno. Maiusc consente regolazioni più fini. Home riporta il punto a 0 dB."],
@@ -177,6 +181,7 @@ export const helpTranslations = {
     ],
     source: [
       ["クリック / ドラッグ", "ツールがオフのとき、クリックで再生位置を移動し、ドラッグで範囲を選択します。"],
+      ["+ / − / Fit", "Edit Audio にフォーカスを移します。+（または =）で拡大、− で縮小します。Fit をクリックすると波形全体が表示されます。"],
       ["⌘ / Pencil", "Command を押し続けるか、Pencil をオンにすると音量を編集できます。クリックでポイントを追加し、ドラッグで移動します。設定範囲は無音から +6 dB までです。ポイント間は直線でつながります。"],
       ["Eraser / Option + クリック", "端点以外の音量ポイントを削除します。Windows では Alt を押しながらクリックします。音声範囲や端点は保持されます。"],
       ["矢印キー / Home", "音量編集時は、左右キーでポイントを選び、上下キーでゲインを調整します。Shift を押すと細かく調整でき、Home で選択中のポイントを 0 dB に戻せます。"],
@@ -218,6 +223,7 @@ export const helpTranslations = {
     ],
     source: [
       ["클릭 / 드래그", "도구가 꺼져 있을 때 클릭하면 해당 위치로 이동하고, 드래그하면 구간을 선택합니다."],
+      ["+ / − / Fit", "Edit Audio 영역에 포커스를 두고 + 또는 = 키로 확대하고, − 키로 축소합니다. Fit을 누르면 전체 파형이 보입니다."],
       ["⌘ / Pencil", "Command를 누르고 있거나 Pencil을 켜면 음량을 편집할 수 있습니다. 클릭으로 점을 추가하고 드래그로 이동합니다. 무음부터 +6 dB까지 조절할 수 있으며, 점과 점 사이는 직선으로 이어집니다."],
       ["Eraser / Option + 클릭", "음량 커브의 양 끝을 제외한 점을 삭제합니다. Windows에서는 Alt를 누른 채 클릭합니다. 음원 구간과 양 끝점은 유지됩니다."],
       ["방향키 / Home", "음량 편집 중 왼쪽·오른쪽 방향키로 점을 선택하고 위·아래 방향키로 음량을 조절합니다. Shift를 누르면 더 세밀하게 조절할 수 있고, Home을 누르면 선택한 점이 0 dB로 돌아갑니다."],
@@ -259,6 +265,7 @@ export const helpTranslations = {
     ],
     source: [
       ["Clicar / arrastar", "Com as ferramentas desativadas, clique para mudar a posição de reprodução ou arraste para selecionar um trecho."],
+      ["+ / − / Fit", "Coloque o foco em Edit Audio. Pressione + (ou =) para ampliar e − para reduzir. Clique em Fit para ver toda a forma de onda."],
       ["⌘ / Pencil", "Mantenha Command pressionada ou ative Pencil para editar o volume. Clique para adicionar um ponto e arraste para movê-lo. O intervalo vai do silêncio a +6 dB, com linhas retas entre os pontos."],
       ["Eraser / Option + clique", "Exclui um ponto de volume intermediário. No Windows, use Alt + clique. Os trechos de áudio e os pontos das extremidades permanecem protegidos."],
       ["Teclas de seta / Home", "Na edição de volume, as setas para a esquerda e para a direita selecionam um ponto. As setas para cima e para baixo ajustam o ganho. Use Shift para ajustes mais finos e Home para voltar a 0 dB."],
@@ -300,6 +307,7 @@ export const helpTranslations = {
     ],
     source: [
       ["Clic / arrastre", "Con las herramientas desactivadas, haz clic para cambiar la posición de reproducción o arrastra para seleccionar un tramo."],
+      ["+ / − / Fit", "Pon el foco en Edit Audio. Pulsa + (o =) para ampliar y − para reducir. Haz clic en Fit para ver toda la forma de onda."],
       ["⌘ / Pencil", "Mantén pulsada la tecla Command o activa Pencil para editar el volumen. Haz clic para añadir un punto y arrástralo para moverlo. El rango va del silencio a +6 dB, con líneas rectas entre los puntos."],
       ["Eraser / Option + clic", "Elimina un punto de volumen intermedio. En Windows, usa Alt + clic. Los tramos de audio y los puntos de los extremos siguen protegidos."],
       ["Teclas de flecha / Home", "Al editar el volumen, las flechas izquierda y derecha seleccionan un punto, y las flechas arriba y abajo ajustan la ganancia. Usa Shift para hacer ajustes más precisos y Home para volver a 0 dB."],

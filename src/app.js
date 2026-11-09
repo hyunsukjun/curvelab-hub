@@ -1,5 +1,5 @@
-import {connectHubHelp} from './help-ui.js?v=hub-sound-chain1';
-import {createControlHelp} from './control-help.js?v=20261108-tooltip-language1';
+import {connectHubHelp} from './help-ui.js?v=hub-source-zoom2';
+import {createControlHelp} from './control-help.js?v=hub-source-zoom1';
 import {tooltipLanguage} from './tooltip-language.js?v=20261108-tooltip-language1';
 import {labTooltipCopy} from './lab-tooltip-copy.js?v=20261108-english-help1';
 import {renderSavedHistory, refreshSavedHistoryTitles} from './history-ui.js?v=20261108-tooltip-language1';
@@ -300,6 +300,17 @@ $('export').onclick=async()=>{try{
 function viewRange(){const n=packet?.channels[0].length||0,span=Math.max(1,Math.round(n/zoom));viewStart=Math.max(0,Math.min(viewStart,Math.max(0,n-span)));return {start:viewStart,end:Math.min(n,viewStart+span)};}
 function setZoom(z){const v=viewRange(),center=(v.start+v.end)/2;zoom=Math.max(1,Math.min(64,z));viewStart=Math.round(center-(packet?.channels[0].length||0)/zoom/2);draw();}
 $('zoom-in').onclick=()=>setZoom(zoom*2);$('zoom-out').onclick=()=>setZoom(zoom/2);$('zoom-fit').onclick=()=>{zoom=1;viewStart=0;draw()};let navigating=false;
+window.addEventListener('keydown', e => {
+ const zoomIn = e.key === '+' || e.key === '=';
+ if (!zoomIn && e.key !== '-' && e.key !== '−') return;
+ if (e.defaultPrevented || e.isComposing || e.metaKey || e.ctrlKey || e.altKey) return;
+ if (document.querySelector('dialog[open]') || !packet || navigating || sourceUI.dragging) return;
+ const target = e.target;
+ if (target !== document.body && !target.closest?.('.source')) return;
+ if (target.matches?.('input, select, textarea') || target.isContentEditable) return;
+ e.preventDefault();
+ $(zoomIn ? 'zoom-in' : 'zoom-out').click();
+});
 function pan(e){const r=$('overview').getBoundingClientRect(),n=packet?.channels[0].length||0;viewStart=Math.round((e.clientX-r.left)/r.width*n-n/zoom/2);draw();}$('overview').onpointerdown=e=>{if(e.button!==0)return;navigating=true;$('overview').setPointerCapture(e.pointerId);pan(e)};$('overview').onpointermove=e=>{if(navigating)pan(e)};$('overview').onpointerup=$('overview').onpointercancel=()=>navigating=false;$('overview').onkeydown=e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const n=packet?.channels[0].length||0;viewStart=e.key==='Home'?0:e.key==='End'?n:viewStart+(e.key==='ArrowRight'?1:-1)*n/zoom*.1;draw();};
 let raster=null,rasterKey='';function draw(){if(!session||!sourceUI)return;const cv=$('wave'),r=cv.getBoundingClientRect(),d=devicePixelRatio||1,v=viewRange(),n=packet?.channels[0].length||0,key=[lastId,v.start,v.end,r.width,r.height,!!colorsData].join(':');if(!raster||key!==rasterKey){raster=document.createElement('canvas');raster.width=Math.max(1,Math.round(r.width*d));raster.height=Math.max(1,Math.round(r.height*d));const ctx=raster.getContext('2d');if(packet&&n&&colorsData){const subset=zoom===1?peaks:summarizeChannels(packet.channels.map(c=>c.subarray(v.start,v.end)));paintWaveform(ctx,{width:r.width,height:r.height,left:64,right:12,peaks:subset,referencePeak:peakOf(peaks),duration:(v.end-v.start)/48000,timeOffset:v.start/48000,title:'Source time',colors:colorsData,colorStart:v.start/n,colorEnd:v.end/n});}else{ctx.fillStyle='#191c20';ctx.fillRect(0,0,raster.width,raster.height);}rasterKey=key;}cv.width=raster.width;cv.height=raster.height;const ctx=cv.getContext('2d');ctx.drawImage(raster,0,0);ctx.scale(d,d);sourceUI.paint(ctx,r.width,r.height,session.view());if(n&&sourceCursor>=v.start&&sourceCursor<=v.end){const x=64+(sourceCursor-v.start)/Math.max(1,v.end-v.start)*(r.width-76);ctx.strokeStyle='#edf5fa';ctx.beginPath();ctx.moveTo(x,22);ctx.lineTo(x,r.height-18);ctx.stroke();}overviewPaint({peaks,colors:colorsData,referencePeak:peakOf(peaks)});$('viewport').style.left=(n?v.start/n*100:0)+'%';$('viewport').style.width=(n?(v.end-v.start)/n*100:100)+'%';$('overview').setAttribute('aria-valuenow',String(n?Math.round(v.start/n*100):0));$('overview').setAttribute('aria-valuetext',`${(v.start/48000).toFixed(2)} to ${(v.end/48000).toFixed(2)} seconds`);$('zoom-fit').textContent=zoom===1?'Fit':`Fit · ${zoom}×`;}
 function size(h){const limit=Number($('split').getAttribute('aria-valuemax'))||editorBudget-300;const next=Math.max(100,Math.min(limit,h));if(next===waveHeight)return;editorRatio=next/editorBudget;fitEditor();}
