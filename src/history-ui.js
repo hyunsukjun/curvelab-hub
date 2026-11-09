@@ -1,4 +1,4 @@
-import {tooltipLanguage} from './tooltip-language.js?v=20261108-tooltip-language1';
+import {tooltipLanguage} from './tooltip-language.js?v=hub-chain-branch1';
 
 export function refreshSavedHistoryTitles(root, view) {
  const stages = new Map(view.history.map(stage => [stage.id, stage]));
@@ -13,7 +13,7 @@ export function refreshSavedHistoryTitles(root, view) {
  }
 }
 
-// Show saved processing stages in chronological order across sources.
+// Follow each saved stage back to the source it was derived from.
 export function renderSavedHistory(root,view,{names,colors,disabled,select,remove,undoRemove,redoRemove}){
  root.tabIndex=-1;
  root.onkeydown=event=>{
@@ -21,8 +21,14 @@ export function renderSavedHistory(root,view,{names,colors,disabled,select,remov
   event.preventDefault();
   if(!event.repeat&&!disabled)(event.shiftKey?redoRemove:undoRemove)();
  };
- const stages=view.history.filter(n=>n.parentId);
  const focused=root.contains(document.activeElement)?document.activeElement:null;
+ const byParent=new Map();
+ for(const stage of view.history){
+  const siblings=byParent.get(stage.parentId)||[];
+  siblings.push(stage);
+  byParent.set(stage.parentId,siblings);
+ }
+ const buttons=[];
  function button(n){
   const b=document.createElement('button');const label=document.createElement('span');label.className='stage-label';label.textContent=n.label;b.append(label);b.dataset.node=n.id;b.dataset.lab=n.lab||'source';b.setAttribute('aria-label',n.label);
   if(n.lab&&names.includes(n.lab))b.style.setProperty('--stage-color',colors[names.indexOf(n.lab)]);
@@ -40,13 +46,32 @@ export function renderSavedHistory(root,view,{names,colors,disabled,select,remov
    b.focus({preventScroll:true});
    select(n.id);
   };
+  buttons.push(b);
   return b;
  }
- const children=stages.map(button);
- root.replaceChildren(...children);
+ function branch(stages,originals=false){
+  const list=document.createElement('ul');
+  list.className=originals?'history-trees':'history-branches';
+  for(const stage of stages){
+   const item=document.createElement('li');
+   item.className='history-node';
+   if(originals){
+    const label=document.createElement('span');
+    label.className='history-origin';
+    label.textContent=label.title=stage.label;
+    item.append(label);
+   }else item.append(button(stage));
+   const children=byParent.get(stage.id);
+   if(children) item.append(branch(children));
+   list.append(item);
+  }
+  return list;
+ }
+ const originals=(byParent.get(null)||[]).filter(stage=>byParent.has(stage.id));
+ root.replaceChildren(...(originals.length?[branch(originals,true)]:[]));
  refreshSavedHistoryTitles(root,view);
- if(focused&&focused!==root){
-  const target=children.find(b=>b.dataset.node===focused.dataset.node)||children.find(b=>b.dataset.node===view.current?.id);
+ if(focused){
+  const target=buttons.find(b=>b.dataset.node===focused.dataset.node)||buttons.find(b=>b.dataset.node===view.current?.id);
   // Retain the history shortcuts when deleting the last visible stage.
   (target&&!target.disabled?target:root).focus({preventScroll:true});
  }

@@ -4,12 +4,12 @@ import {initialEdit,lengthOf,deleteRange,setFade,materialize} from '../labs/audi
 const clone=x=>structuredClone(x),copy=p=>({...p,referenceBlob:undefined,channels:p.channels.map(c=>c.slice())});
 const MAX_EDIT_UNDO=30;
 export class HubSession{
- constructor(renderer,change=()=>{}){this.renderer=renderer;this.change=change;this.nodes=[];this.deletedStages=[];this.stageDeletionRedo=[];this.undoEdits=[];this.redoEdits=[];this.current=null;this.working=null;this.preview=null;this.job=null;this.serial=0;this.revision=0;this.status='Loading Bach Prelude…';this.error='';this.progress=0;}
+ constructor(renderer,change=()=>{}){this.renderer=renderer;this.change=change;this.nodes=[];this.deletedStages=[];this.stageDeletionRedo=[];this.undoEdits=[];this.redoEdits=[];this.current=null;this.working=null;this.reopened=null;this.preview=null;this.job=null;this.serial=0;this.revision=0;this.restoreCount=0;this.status='Loading Bach Prelude…';this.error='';this.progress=0;}
  view(){
   const n=this.current,w=this.working;
   return {current:n?{id:n.id,inputId:w.id,label:n.label,kind:n.kind,parentId:n.parentId,frames:w.packet.channels[0].length,sampleRate:w.packet.sampleRate,channels:w.packet.channels.length}:null,
-   edit:w?.editState?{selection:clone(w.selection),fadeIn:w.editState.fadeIn,fadeOut:w.editState.fadeOut,volume:clone(w.editState.volume),rate:w.editState.rate,canUndo:!!this.undoEdits.length,canRedo:!!this.redoEdits.length,modified:w.editState!==n.editState}:null,
-   history:this.nodes.map(n=>({id:n.id,label:n.label,parentId:n.parentId,lab:this.stageLab(n)})),activeJob:!!this.job,status:this.status,error:this.error,progress:this.progress,revision:this.revision,preview:!!this.preview};
+   edit:w?.editState?{selection:clone(w.selection),fadeIn:w.editState.fadeIn,fadeOut:w.editState.fadeOut,volume:clone(w.editState.volume),rate:w.editState.rate,canUndo:!!this.undoEdits.length,canRedo:!!this.redoEdits.length,modified:w.editState!==this.editBase.editState}:null,
+   history:this.nodes.map(n=>({id:n.id,label:n.label,parentId:n.parentId,lab:this.stageLab(n)})),activeJob:!!this.job,status:this.status,error:this.error,progress:this.progress,revision:this.revision,restoreCount:this.restoreCount,preview:!!this.preview};
  }
  stageLab(n){while(n){if(n.renderSpec?.lab)return n.renderSpec.lab;if(n.labProvenance)return n.labProvenance;n=this.nodes.find(parent=>parent.id===n.parentId);}return null;}
  original(){let n=this.current;while(n?.parentId)n=this.nodes.find(parent=>parent.id===n.parentId);return n;}
@@ -23,8 +23,10 @@ export class HubSession{
   const stages=[...this.nodes,...deleted.map(record=>record.stage)];if(node)stages.push(node);
   const buffers=new Set();
   for(const n of [...stages,...edits]){
-   n.packet?.channels.forEach(c=>buffers.add(c.buffer));
-   n.editState?.pieces.forEach(p=>p.channels.forEach(c=>buffers.add(c.buffer)));
+   for(const source of [n,n.recipe]){
+    source?.packet?.channels.forEach(c=>buffers.add(c.buffer));
+    source?.editState?.pieces.forEach(p=>p.channels.forEach(c=>buffers.add(c.buffer)));
+   }
   }
   if(stages.length>30||[...buffers].reduce((a,b)=>a+b.byteLength,0)>256*1024*1024)throw new Error('Session history limit reached. Export before starting a new session.');
  }
@@ -37,13 +39,20 @@ export class HubSession{
    catch{this.deletedStages.shift();}
   }
   this.nodes.push(n);this.resetWorking(n);this.preview=null;this.revision++;}
- resetWorking(n){
+ get editBase(){return this.reopened?.recipe||this.current;}
+ get baseInputId(){return this.reopened?`${this.current.id}:input`:this.current?.id;}
+ get editorWorkspace(){return (this.reopened||this.current)?.workspace;}
+ rememberWorkspace(workspace){if(this.current)(this.reopened||this.current).workspace=clone(workspace);}
+ resetWorking(n,reopen=false){
   this.current=n;
-  this.working={id:n.id,packet:n.packet,editState:n.editState,selection:null};
+  const recipe=reopen?n.recipe:null;
+  this.reopened=recipe?{recipe,workspace:clone(recipe.workspace)}:null;
+  const {packet,editState}=this.editBase;
+  this.working={id:this.baseInputId,packet,editState,selection:null};
   this.undoEdits=[];this.redoEdits=[];
  }
  async load(producer){this.invalidate();const token=++this.serial;this.job={token};this.status='Loading…';this.error='';this.emit();try{const p=await producer();await this.validate(p,true);if(this.job?.token!==token)return false;const n=this.make(p,p.name||'Source',null);this.publish(n);this.job=null;this.status='Input ready';this.emit();return true;}catch(e){if(this.job?.token!==token)return false;this.job=null;this.error=e.message;this.status=e.message;this.emit();return false;}}
- restore(id){const n=this.nodes.find(n=>n.id===id);if(!n)return false;this.invalidate();this.resetWorking(n);this.status='Restored · Audio and settings';this.emit();return true;}
+ restore(id){const n=this.nodes.find(n=>n.id===id);if(!n)return false;this.invalidate();this.resetWorking(n,true);this.restoreCount++;this.status='Restored · Audio and settings';this.emit();return true;}
  deleteSelectedStage(id){
   if(this.current?.id!==id)return false;
   return this.deleteStage(id,false);
@@ -114,53 +123,79 @@ export class HubSession{
  // Undo entries keep edit instructions and shared source pieces, not rendered PCM copies.
  async applyEditState(next,undo,redo){
   this.invalidate();
-  const controller=new AbortController(),token=++this.serial,stage=this.current;
+  const controller=new AbortController(),token=++this.serial,base=this.editBase;
   this.job={token,cancel:()=>controller.abort()};this.status='Applying source edit…';this.error='';this.emit();
   try{
-   const saved=next.editState===stage.editState,length=lengthOf(next.editState);
-   const packet=saved?stage.packet:{...stage.packet,channels:[new Float32Array(length),new Float32Array(length)]};
-   const working={...next,id:saved?stage.id:'edit-'+token,packet};
+   const saved=next.editState===base.editState,length=lengthOf(next.editState);
+   const packet=saved?base.packet:{...base.packet,channels:[new Float32Array(length),new Float32Array(length)]};
+   const working={...next,id:saved?this.baseInputId:'edit-'+token,packet};
    this.capacity(null,this.deletedStages,[working,...undo,...redo]);
    if(!saved){await materialize(next.editState,packet.channels,controller.signal);await this.validate(packet);}
    if(this.job?.token!==token)return false;
    this.working=working;this.undoEdits=undo;this.redoEdits=redo;this.job=null;this.status='Source edit applied';this.emit();return true;
   }catch(e){if(this.job?.token!==token)return false;this.job=null;this.status=e.message;this.error=e.message;this.emit();return false;}
  }
+ async prepareOutput(lab,input,spec,outputGainDb,signal,onProgress=()=>{}){
+  signal.throwIfAborted();
+  const job=this.renderer(lab,copy(input),clone(spec),progress=>onProgress(progress*.85));
+  const cancel=()=>job.cancel?.();
+  signal.addEventListener('abort',cancel,{once:true});
+  try{
+   const result=await job.promise;
+   signal.throwIfAborted();
+   await this.validate(result,false,{checkSamples:false});
+   if(result.channels.length!==2)throw new Error('Hub output requires stereo; current stage retained.');
+   onProgress(.85,'Checking output level…');
+   const outputGain=await applyOutputGain(result.channels,outputGainDb,{signal});
+   return {packet:{...result,referenceBlob:undefined,name:input.name},outputGain};
+  }finally{signal.removeEventListener('abort',cancel);}
+ }
  // Prepare the target while the current work remains authoritative. A null spec passes the working audio through.
- async handoff(lab,spec,workspace,target,prepareTarget,{outputGainDb=0}={}){
+ async handoff(lab,spec,workspace,target,prepareTarget,{outputGainDb=0,restoreId=null,prepared=null}={}){
+  const restoreStage=restoreId===null?null:this.nodes.find(node=>node.id===restoreId);
   if(this.job||!this.current||!this.working.packet.channels[0].length)return false;
-  this.current.workspace=clone(workspace);
-  const input=this.current,working=this.working,revision=this.revision,token=++this.serial;
-  const controller=new AbortController();this.job={token,cancel:()=>controller.abort()};this.progress=0;this.error='';this.status=spec?'Processing '+lab+' → '+target+'…':'Preparing '+target+'…';this.emit();
+  if(restoreId!==null&&(!restoreStage||!spec))return false;
+  this.rememberWorkspace(workspace);
+  const input=this.current,working=this.working,reopened=this.reopened,recipeWorkspace=this.editorWorkspace;
+  const revision=this.revision,token=++this.serial;
+  const controller=new AbortController();this.job={token,cancel:()=>controller.abort()};this.progress=0;this.error='';this.status=restoreStage?'Saving '+lab+'…':spec?'Processing '+lab+' → '+target+'…':'Preparing '+target+'…';this.emit();
   const valid=()=>this.job?.token===token&&this.current===input&&this.working===working&&this.revision===revision;
   try{
    const nextWorkspace={active:target,byLab:{},grainChannel:workspace.grainChannel||'mix'};
    if(!spec){
-    await prepareTarget({id:working.id,packet:working.packet,workspace:nextWorkspace},valid,controller.signal);
+    // Leaving a clean reopened editor continues from its saved output.
+    const nextInput=reopened?input:working;
+    await prepareTarget({id:nextInput.id,packet:nextInput.packet,workspace:nextWorkspace},valid,controller.signal);
     if(!valid())return false;
     input.workspace=nextWorkspace;
+    if(reopened)this.resetWorking(input);
     this.preview=null;this.revision++;
     this.job=null;this.progress=1;this.status=target[0].toUpperCase()+target.slice(1)+' ready · Working audio retained';
     this.emit();return true;
    }
-   const job=this.renderer(lab,this.packet(),clone(spec),p=>{if(valid()){this.progress=p*.85;this.emit();}});
-   controller.signal.addEventListener('abort',()=>job.cancel?.(),{once:true});
-   if(controller.signal.aborted)job.cancel?.();
-   const result=await job.promise;if(!valid())return false;
-   // The peak scan also rejects non-finite samples and can yield to cancellation.
-   await this.validate(result,false,{checkSamples:false});if(!valid())return false;
-   if(result.channels.length!==2)throw new Error('Next Lab requires stereo; current stage retained.');
-   this.status='Checking output level…';this.progress=.85;this.emit();
-   const outputGain=await applyOutputGain(result.channels,outputGainDb,{signal:controller.signal});
+   const {packet:result,outputGain}=prepared??await this.prepareOutput(lab,working.packet,spec,outputGainDb,controller.signal,(progress,status)=>{
+    if(!valid())return;
+    this.progress=progress;
+    if(status)this.status=status;
+    this.emit();
+   });
    if(!valid())return false;
-   const candidate=this.make({...result,name:this.working.packet.name},lab[0].toUpperCase()+lab.slice(1)+' · '+(result.channels[0].length/48000).toFixed(2)+' s',input.id,nextWorkspace);
+   const parentId=reopened?input.parentId:input.id;
+   const candidate=this.make({...result,name:working.packet.name},lab[0].toUpperCase()+lab.slice(1)+' · '+(result.channels[0].length/48000).toFixed(2)+' s',parentId,nextWorkspace);
    candidate.renderSpec={lab,spec:clone(spec)};
+   // The working input is immutable here. Keep it even if its parent is deleted.
+   candidate.recipe={packet:working.packet,editState:working.editState,workspace:recipeWorkspace,outputGainDb};
    if(outputGain.requestedGainDb!==0||outputGain.limited)candidate.outputGain=outputGain;
    this.capacity(candidate);
-   this.status='Preparing '+target+'…';this.progress=.9;this.emit();
-   await prepareTarget(candidate,valid,controller.signal);if(!valid())return false;
+   if(!restoreStage){
+    this.status='Preparing '+target+'…';this.progress=.9;this.emit();
+    await prepareTarget(candidate,valid,controller.signal);if(!valid())return false;
+   }
    this.publish(candidate);this.job=null;this.progress=1;
-   this.status=target[0].toUpperCase()+target.slice(1)+' ready · Previous stage retained';
+   if(restoreStage){
+    this.resetWorking(restoreStage,true);this.restoreCount++;
+    this.status='Saved '+candidate.label+' · Restored '+restoreStage.label;
+   }else this.status=target[0].toUpperCase()+target.slice(1)+' ready · Previous stage retained';
    if(outputGain.skipped)this.status+=' · Output Gain skipped for near silence';
    else if(candidate.outputGain){
     const gain=outputGain.gainDb;
@@ -170,5 +205,5 @@ export class HubSession{
    this.emit();return true;
   }catch(e){if(!valid())return false;this.job=null;this.error=e.message;this.status=e.message;this.emit();return false;}
  }
- async run(lab,spec,workspace,apply){if(this.job||!this.current||!this.working.packet.channels[0].length)return false;this.current.workspace=clone(workspace);const input=this.current,revision=this.revision,token=++this.serial;this.job={token};this.progress=0;this.error='';this.status=apply?'Applying…':'Preparing preview…';this.emit();const valid=()=>this.job?.token===token&&this.current===input&&this.revision===revision;try{const job=this.renderer(lab,this.packet(),clone(spec),p=>{if(valid()){this.progress=p;this.emit();}});this.job.cancel=job.cancel;const result=await job.promise;if(!valid())return false;await this.validate(result);if(!valid())return false;if(apply){const candidate=this.make(result,`${lab[0].toUpperCase()+lab.slice(1)} · ${result.channels[0].length/48000>=60?'':(result.channels[0].length/48000).toFixed(2)+' s'}`,input.id);candidate.renderSpec={lab,spec:clone(spec)};this.publish(candidate);this.status='Applied · Result is the next input';}else{this.preview={packet:copy(result),inputId:input.id,revision,lab,spec:clone(spec)};this.status='Preview ready · Input unchanged';}this.job=null;this.emit();return true;}catch(e){if(!valid())return false;this.job=null;this.error=e.message;this.status=e.message;this.emit();return false;}}
+ async run(lab,spec,workspace,apply){if(this.job||!this.current||!this.working.packet.channels[0].length)return false;this.rememberWorkspace(workspace);const input=this.current,revision=this.revision,token=++this.serial;this.job={token};this.progress=0;this.error='';this.status=apply?'Applying…':'Preparing preview…';this.emit();const valid=()=>this.job?.token===token&&this.current===input&&this.revision===revision;try{const job=this.renderer(lab,this.packet(),clone(spec),p=>{if(valid()){this.progress=p;this.emit();}});this.job.cancel=job.cancel;const result=await job.promise;if(!valid())return false;await this.validate(result);if(!valid())return false;if(apply){const candidate=this.make(result,`${lab[0].toUpperCase()+lab.slice(1)} · ${result.channels[0].length/48000>=60?'':(result.channels[0].length/48000).toFixed(2)+' s'}`,input.id);candidate.renderSpec={lab,spec:clone(spec)};this.publish(candidate);this.status='Applied · Result is the next input';}else{this.preview={packet:copy(result),inputId:input.id,revision,lab,spec:clone(spec)};this.status='Preview ready · Input unchanged';}this.job=null;this.emit();return true;}catch(e){if(!valid())return false;this.job=null;this.error=e.message;this.status=e.message;this.emit();return false;}}
 }

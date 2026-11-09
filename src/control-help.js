@@ -1,4 +1,4 @@
-import {tooltipLanguage} from './tooltip-language.js?v=20261108-tooltip-language1';
+import {tooltipLanguage} from './tooltip-language.js?v=hub-chain-branch1';
 
 const delay = 500;
 const gap = 8;
@@ -32,8 +32,8 @@ const hubControlCopy = {
   '#grain-channel': ['hub.grainSource', 'Mono mix uses 50% left and 50% right. Left and Right use one original channel.'],
   '#open-ir': ['hub.openIR', 'Open a separate file to use as an impulse response.'],
   '#rewind': ['hub.rewind', 'Move playback to the start.'],
-  '#play': ['hub.play', 'Play or pause the active Lab with Space.'],
-  '#output-gain': ['hub.gain', 'Adjust live playback and the next Lab handoff. Peak ceiling at handoff: −1 dBFS.'],
+  '#play': ['hub.play', 'Press Space to play or pause the same output used for WAV export.'],
+  '#output-gain': ['hub.gain', 'Set gain for playback, WAV and the next Lab. Processed output is capped at −1 dBFS.'],
   '#hub-clip': ['hub.clip', 'Output clip indicator. Click to reset.'],
 };
 
@@ -245,7 +245,7 @@ export function createControlHelp() {
     registerLabTab(button, lab) {
       register(button, () => {
         const summary = tooltipLanguage.text(`tab.${lab}`, labTabTooltipCopy[lab]);
-        const handoff = tooltipLanguage.text('tab.handoff', 'Switching Labs saves the current result as a stage.');
+        const handoff = tooltipLanguage.text('tab.handoff', 'Switching Labs saves a new stage when processing settings changed.');
         return `${summary} ${handoff}`;
       });
     },

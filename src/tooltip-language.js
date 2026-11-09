@@ -13,7 +13,7 @@ export const tooltipLanguage = {
 
     let next = {};
     try {
-      if (code !== 'en') next = (await import(`./tooltip-translations/${code}.js?v=20261108-tooltip-language1`)).default;
+      if (code !== 'en') next = (await import(`./tooltip-translations/${code}.js?v=hub-chain-branch1`)).default;
     } catch {
       code = 'en';
     }

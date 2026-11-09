@@ -1,7 +1,7 @@
 // Hub input adapter. Volume, deletion and fade calculations use the pinned Audio core.
 import {volumePoints,volumeNorm,volumeDb,volumeLabel,volumeGainAt,putVolumePoint,eraseVolumePoint,hasSourceVolume} from '../labs/audio/src/source-volume.js?v=20261028-volume-line1';
 import {volumePointer,volumeHit} from '../labs/audio/src/source-volume-view.js?v=20261028-volume-line1';
-import {tooltipLanguage} from './tooltip-language.js?v=20261108-tooltip-language1';
+import {tooltipLanguage} from './tooltip-language.js?v=hub-chain-branch1';
 export function connectSourceEditor(session,repaint,getView=()=>({start:0,end:session.view().current?.frames||0}),seek=()=>{},beforeVolume=()=>{},busyChanged=()=>{},getCursor=()=>getView().start,toolChanged=()=>{}){
  const $=id=>document.getElementById(id),wave=$('wave');let gesture=null,view=null,held=false,latched=false,volumeTool='pen',selected=0,pending=false,lastNode=null;
  const seconds=n=>Number(n.toFixed(6)).toString(),editing=()=>held||latched||gesture?.kind==='volume',activeTool=()=>held?'pen':volumeTool;
