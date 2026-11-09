@@ -27,7 +27,7 @@ export const helpTranslations = {
       ["Escape", "取消正在进行的成组拖动。"],
       ["Option/Alt + ← / →", "在 Timbre 和 Spectral 中调整当前获得焦点的效果模块的顺序。"],
     ],
-    playback: "焦点位于输入控件、选择控件和帮助之外时，按空格键播放或暂停。切换 Lab 时，系统会将处理后的工作音频和当前 Lab 设置保存为一个新阶段。焦点位于选中的阶段时，按 Delete 可移除该阶段并选中上一阶段。焦点位于历史记录区域时，按 Command+Z 可恢复最近删除的阶段，再按 Shift+Command+Z 可重新删除。Download WAV 会导出选中的已保存阶段。保存该阶段后的编辑会在切换 Lab 时纳入新的阶段。",
+    playback: "焦点位于输入控件、选择控件和帮助之外时，按空格键播放或暂停。只有更改了处理设置，切换 Lab 时才会在 Sound Chain 中添加一个阶段。焦点位于选中的阶段时，按 Delete 可移除该阶段并选中上一阶段。焦点位于历史记录区域时，按 Command+Z 可恢复最近删除的阶段，再按 Shift+Command+Z 可重新删除。Download WAV 会导出选中的已保存阶段。切换 Lab 时会保留对源音频的编辑。",
     processing: [
       "波形显示正在编辑的音频。源音频编辑有独立的撤销和重做记录，切换到另一个阶段时，将从该阶段保存的音频继续编辑。要还原当前源文件，请在 Edit Audio 中选择 Original。各 Lab 沿用各自的实时播放和文件渲染流程。Space 的耳机预听效果可能与 WAV 文件不同。各阶段仍使用原有的输出淡入淡出与保护设置。",
       "历史记录仅保存在内存中，最多 30 个阶段，音频总量最多 256 MiB。关闭或重新加载后，本次会话将丢失。",
@@ -68,7 +68,7 @@ export const helpTranslations = {
       ["Échap", "Annule le déplacement de groupe en cours."],
       ["Option/Alt + ← / →", "Dans Timbre et Spectral, déplace le bloc d’effet qui a le focus dans la chaîne."],
     ],
-    playback: "La barre d’espace lance ou met en pause la lecture, sauf dans les champs, les listes de sélection et l’aide. Passer à un autre Lab enregistre dans une nouvelle étape l’audio de travail traité et les réglages actuels du Lab. Lorsqu’une étape sélectionnée a le focus, Suppr la retire et sélectionne la précédente. Si le focus est dans l’historique, Commande+Z restaure la dernière étape supprimée et Maj+Commande+Z la supprime à nouveau. Download WAV exporte l’étape enregistrée sélectionnée. Les modifications apportées après son enregistrement sont prises en compte au prochain changement de Lab.",
+    playback: "La barre d’espace lance ou met en pause la lecture, sauf dans les champs, les listes de sélection et l’aide. Un changement de Lab ajoute une étape à la Sound Chain uniquement si les réglages de traitement ont changé. Lorsqu’une étape sélectionnée a le focus, Suppr la retire et sélectionne la précédente. Si le focus est dans l’historique, Commande+Z restaure la dernière étape supprimée et Maj+Commande+Z la supprime à nouveau. Download WAV exporte l’étape enregistrée sélectionnée. Les modifications de l’audio source sont conservées lors du changement de Lab.",
     processing: [
       "La forme d’onde affiche l’audio de travail. Les modifications de la source disposent de leurs propres commandes d’annulation et de rétablissement. Lorsque vous choisissez une autre étape, vous repartez de l’audio enregistré pour celle-ci. Choisissez Original dans Edit Audio pour rétablir la source originale. Chaque Lab utilise ses propres fonctions de lecture en direct et de rendu de fichier. Dans Space, le rendu au casque peut différer du WAV. Chaque étape conserve ses fondus de sortie et ses protections.",
       "L’historique est conservé en mémoire, dans la limite de 30 étapes et de 256 Mio d’audio. Fermer ou recharger l’application met fin à la session.",
@@ -109,7 +109,7 @@ export const helpTranslations = {
       ["Esc", "Bricht das laufende Verschieben einer Punktgruppe ab."],
       ["Wahl/Alt + ← / →", "Verschiebt in Timbre und Spectral den fokussierten Effektblock in der Effektkette."],
     ],
-    playback: "Die Leertaste startet oder pausiert die Wiedergabe außerhalb von Eingabefeldern, Auswahllisten und Hilfe. Beim Wechsel in ein anderes Lab werden das verarbeitete Arbeitsaudio und die aktuellen Lab-Einstellungen als neue Stufe gespeichert. Hat eine ausgewählte Stufe den Fokus, löscht die Löschtaste diese Stufe und wählt ihre Vorgängerin aus. Liegt der Fokus im Verlauf, stellt Befehl+Z die zuletzt gelöschte Stufe wieder her. Umschalt+Befehl+Z löscht sie erneut. Download WAV exportiert die ausgewählte gespeicherte Stufe. Spätere Änderungen werden beim nächsten Lab-Wechsel berücksichtigt.",
+    playback: "Die Leertaste startet oder pausiert die Wiedergabe außerhalb von Eingabefeldern, Auswahllisten und Hilfe. Beim Lab-Wechsel wird nur dann eine Stufe zur Sound Chain hinzugefügt, wenn sich die Verarbeitungseinstellungen geändert haben. Hat eine ausgewählte Stufe den Fokus, löscht die Löschtaste diese Stufe und wählt ihre Vorgängerin aus. Liegt der Fokus im Verlauf, stellt Befehl+Z die zuletzt gelöschte Stufe wieder her. Umschalt+Befehl+Z löscht sie erneut. Download WAV exportiert die ausgewählte gespeicherte Stufe. Änderungen am Quellaudio bleiben beim Lab-Wechsel erhalten.",
     processing: [
       "Die Wellenform zeigt das aktuelle Arbeitsaudio. Quellbearbeitungen lassen sich separat rückgängig machen und wiederholen. Wenn Sie eine andere Stufe wählen, beginnen Sie mit deren gespeichertem Audio. Wählen Sie in Edit Audio die Schaltfläche Original, um die ursprüngliche Quelle wiederherzustellen. Jedes Lab verwendet seine eigene Echtzeitwiedergabe und Dateiausgabe. In Space kann sich die Kopfhörervorschau von der WAV-Datei unterscheiden. Die Ausgangs-Fades und Schutzfunktionen jeder Stufe bleiben erhalten.",
       "Der Verlauf liegt im Arbeitsspeicher und umfasst höchstens 30 Stufen und 256 MiB Audio. Beim Schließen oder Neuladen geht die Sitzung verloren.",
@@ -150,7 +150,7 @@ export const helpTranslations = {
       ["Esc", "Annulla lo spostamento di gruppo in corso."],
       ["Opzione/Alt + ← / →", "In Timbre e Spectral sposta nella catena il blocco effetto che ha il focus."],
     ],
-    playback: "La barra spaziatrice avvia o mette in pausa la riproduzione, salvo quando il focus è su campi di inserimento, menu di selezione o guida. Passare a un altro Lab salva in una nuova fase l’audio di lavoro elaborato e le impostazioni attuali del Lab. Quando una fase selezionata ha il focus, Canc la elimina e seleziona la fase precedente. Con il focus nella cronologia, Comando+Z ripristina l’ultima fase eliminata e Maiusc+Comando+Z la elimina di nuovo. Download WAV esporta la fase salvata selezionata. Le modifiche effettuate dopo il salvataggio vengono incluse al successivo cambio di Lab.",
+    playback: "La barra spaziatrice avvia o mette in pausa la riproduzione, salvo quando il focus è su campi di inserimento, menu di selezione o guida. Il passaggio a un altro Lab aggiunge una fase alla Sound Chain solo se le impostazioni di elaborazione sono cambiate. Quando una fase selezionata ha il focus, Canc la elimina e seleziona la fase precedente. Con il focus nella cronologia, Comando+Z ripristina l’ultima fase eliminata e Maiusc+Comando+Z la elimina di nuovo. Download WAV esporta la fase salvata selezionata. Le modifiche all’audio sorgente vengono mantenute quando si cambia Lab.",
     processing: [
       "La forma d’onda mostra l’audio di lavoro. Le modifiche alla sorgente dispongono di comandi di annullamento e ripristino separati. Selezionando un’altra fase, riparti dall’audio salvato per quella fase. Seleziona Original in Edit Audio per ripristinare la sorgente originale. Ogni Lab usa le proprie funzioni di riproduzione in tempo reale e di rendering su file. In Space, l’anteprima in cuffia può differire dal WAV. Ogni fase conserva le dissolvenze di uscita e le protezioni previste.",
       "La cronologia è conservata in memoria fino a 30 fasi e 256 MiB di audio. La chiusura o il ricaricamento dell’app azzera la sessione.",
@@ -191,7 +191,7 @@ export const helpTranslations = {
       ["Escape", "ドラッグ中のポイントの一括移動を取り消します。"],
       ["Option/Alt + ← / →", "Timbre と Spectral では、フォーカス中のエフェクトブロックの順番を変えられます。"],
     ],
-    playback: "入力欄、選択メニュー、ヘルプ以外にフォーカスがあるときは、スペースキーで再生または一時停止します。Lab を切り替えると、処理済みの作業用音声と現在の Lab の設定が新しいステージとして保存されます。選択中のステージにフォーカスがあるときは、Delete でそのステージを削除し、直前のステージを選択します。履歴内にフォーカスがあるときは、Command+Z で最後に削除したステージを復元し、Shift+Command+Z で再び削除します。Download WAV では、選択中の保存済みステージを書き出します。そのステージを保存した後の編集は、Lab を切り替えたときの新しいステージに含まれます。",
+    playback: "入力欄、選択メニュー、ヘルプ以外にフォーカスがあるときは、スペースキーで再生または一時停止します。処理設定を変更した場合のみ、Lab の切り替え時に Sound Chain へ新しいステージが追加されます。選択中のステージにフォーカスがあるときは、Delete でそのステージを削除し、直前のステージを選択します。履歴内にフォーカスがあるときは、Command+Z で最後に削除したステージを復元し、Shift+Command+Z で再び削除します。Download WAV では、選択中の保存済みステージを書き出します。ソース音声の編集は Lab を切り替えても引き継がれます。",
     processing: [
       "波形は作業用音声を表示します。元音声の編集には専用の取り消しとやり直しがあり、別のステージを選ぶと、そのステージに保存された音声から編集を始めます。元の音声に戻すには、Edit Audio で Original を選択します。各 Lab は従来どおりのリアルタイム再生処理とファイル書き出し処理を使います。Space のヘッドフォンでのプレビューと WAV が異なる場合があります。各ステージの出力フェードと保護処理はそのまま適用されます。",
       "履歴はメモリ内にのみ保持されます。上限は 30 ステージ、音声データは 256 MiB です。閉じたり再読み込みしたりするとセッションは失われます。",
@@ -232,7 +232,7 @@ export const helpTranslations = {
       ["Escape", "진행 중인 여러 점의 드래그를 취소합니다."],
       ["Option/Alt + ← / →", "Timbre와 Spectral에서 포커스가 있는 효과 블록의 순서를 바꿉니다."],
     ],
-    playback: "입력란, 선택 메뉴, 도움말 밖에서 스페이스바를 누르면 재생하거나 일시 정지합니다. Lab을 바꾸면 처리된 작업 음원과 현재 Lab 설정을 새 단계로 저장합니다. 선택한 단계에 포커스가 있을 때 Delete를 누르면 해당 단계가 삭제되고 바로 앞 단계가 선택됩니다. 이력에 포커스가 있을 때 Command+Z를 누르면 마지막으로 삭제한 단계를 복구하고, Shift+Command+Z를 누르면 그 단계를 다시 삭제합니다. Download WAV는 선택한 저장 단계를 내보냅니다. 해당 단계가 저장된 뒤의 편집은 Lab을 바꿀 때 새 단계에 포함됩니다.",
+    playback: "입력란, 선택 메뉴, 도움말 밖에서 스페이스바를 누르면 재생하거나 일시 정지합니다. 처리 설정을 바꾼 경우에만 랩을 전환할 때 사운드체인에 새 단계를 추가합니다. 선택한 단계에 포커스가 있을 때 Delete를 누르면 해당 단계가 삭제되고 바로 앞 단계가 선택됩니다. 이력에 포커스가 있을 때 Command+Z를 누르면 마지막으로 삭제한 단계를 복구하고, Shift+Command+Z를 누르면 그 단계를 다시 삭제합니다. Download WAV는 선택한 저장 단계를 내보냅니다. Edit Audio에서 편집한 작업 음원은 랩을 전환해도 이어집니다.",
     processing: [
       "파형에는 현재 작업 음원이 표시됩니다. 원본 편집은 별도로 실행 취소하거나 다시 실행할 수 있습니다. 다른 단계를 선택하면 그 단계에 저장된 음원부터 편집합니다. 원본으로 돌아가려면 Edit Audio의 Original을 선택합니다. 각 Lab은 기존 실시간 재생과 파일 출력 방식을 사용합니다. Space의 헤드폰 미리듣기와 WAV는 다를 수 있습니다. 단계별 출력 페이드와 보호 처리는 기존대로 적용됩니다.",
       "이력은 메모리에만 남으며 최대 30단계, 음원 데이터 최대 256 MiB까지 저장합니다. 창을 닫거나 새로고침하면 작업 내용이 사라집니다.",
@@ -273,7 +273,7 @@ export const helpTranslations = {
       ["Escape", "Cancela o arrasto de um grupo de pontos em curso."],
       ["Option/Alt + ← / →", "Em Timbre e Spectral, muda a posição do bloco de efeito que está em foco."],
     ],
-    playback: "A barra de espaço inicia ou pausa a reprodução quando o foco está fora de campos de entrada, seletores e da ajuda. Ao trocar de Lab, o áudio de trabalho processado e as configurações atuais do Lab são salvos como uma nova etapa. Com o foco na etapa selecionada, Delete remove essa etapa e seleciona a anterior. Com o foco no histórico, Command+Z restaura a última etapa removida e Shift+Command+Z volta a removê-la. Download WAV exporta a etapa salva selecionada. As alterações posteriores ao salvamento dessa etapa são incluídas ao trocar de Lab.",
+    playback: "A barra de espaço inicia ou pausa a reprodução quando o foco está fora de campos de entrada, seletores e da ajuda. Ao trocar de Lab, uma etapa só é adicionada à Sound Chain se as configurações de processamento tiverem mudado. Com o foco na etapa selecionada, Delete remove essa etapa e seleciona a anterior. Com o foco no histórico, Command+Z restaura a última etapa removida e Shift+Command+Z volta a removê-la. Download WAV exporta a etapa salva selecionada. As edições no áudio de origem são mantidas ao trocar de Lab.",
     processing: [
       "A forma de onda mostra o áudio de trabalho. As alterações no áudio de origem podem ser desfeitas e refeitas separadamente. Ao selecionar outra etapa, o trabalho recomeça a partir do áudio salvo nessa etapa. Selecione Original em Edit Audio para restaurar o áudio de origem. Cada Lab usa os seus próprios processos de reprodução ao vivo e renderização para arquivo. A prévia de Space nos fones de ouvido pode diferir do WAV. Cada etapa conserva os seus fades e a proteção de saída.",
       "O histórico fica apenas na memória, com até 30 etapas e até 256 MiB de áudio. Fechar ou recarregar encerra a sessão.",
@@ -314,7 +314,7 @@ export const helpTranslations = {
       ["Escape", "Cancela el arrastre en curso de un grupo de puntos."],
       ["Option/Alt + ← / →", "En Timbre y Spectral, cambia la posición del bloque de efecto que tiene el foco."],
     ],
-    playback: "La barra espaciadora inicia o pausa la reproducción cuando el foco está fuera de los campos de entrada, los selectores y la ayuda. Al cambiar de Lab, el audio de trabajo procesado y los ajustes actuales del Lab se guardan en una nueva etapa. Cuando la etapa seleccionada tiene el foco, Delete la elimina y selecciona la anterior. Con el foco en el historial, Command+Z recupera la última etapa eliminada y Shift+Command+Z vuelve a eliminarla. Download WAV exporta la etapa guardada que esté seleccionada. Los cambios posteriores al guardado de esa etapa se incorporan al cambiar de Lab.",
+    playback: "La barra espaciadora inicia o pausa la reproducción cuando el foco está fuera de los campos de entrada, los selectores y la ayuda. Al cambiar de Lab solo se añade una etapa a la Sound Chain si han cambiado los ajustes de procesamiento. Cuando la etapa seleccionada tiene el foco, Delete la elimina y selecciona la anterior. Con el foco en el historial, Command+Z recupera la última etapa eliminada y Shift+Command+Z vuelve a eliminarla. Download WAV exporta la etapa guardada que esté seleccionada. Los cambios en el audio de origen se conservan al cambiar de Lab.",
     processing: [
       "La forma de onda muestra el audio de trabajo. Los cambios en el audio de origen se deshacen y rehacen por separado. Al seleccionar otra etapa, se empieza a trabajar con el audio guardado en ella. Elige Original en Edit Audio para recuperar el audio de origen. Cada Lab mantiene sus propios procesos de reproducción en tiempo real y renderizado a archivo. La preescucha de Space con auriculares puede diferir del WAV. Cada etapa conserva sus fundidos y la protección de salida.",
       "El historial solo se guarda en memoria, con un máximo de 30 etapas y 256 MiB de audio. Al cerrar o recargar se pierde la sesión.",

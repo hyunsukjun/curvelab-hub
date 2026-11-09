@@ -1,4 +1,4 @@
-import {connectHubHelp} from './help-ui.js?v=20261108-tooltip-language1';
+import {connectHubHelp} from './help-ui.js?v=hub-sound-chain1';
 import {createControlHelp} from './control-help.js?v=20261108-tooltip-language1';
 import {tooltipLanguage} from './tooltip-language.js?v=20261108-tooltip-language1';
 import {labTooltipCopy} from './lab-tooltip-copy.js?v=20261108-english-help1';
@@ -6,10 +6,10 @@ import {renderSavedHistory, refreshSavedHistoryTitles} from './history-ui.js?v=2
 import {connectOutputMeter} from './output-meter-ui.js?v=20261107-shared-tools2';
 import {granularSourceMode} from './granular-source.js';
 import {NativeTransport} from './native-transport.js';
-import {HubSession} from './session.js?v=20261108-relative-gain1';
+import {HubSession} from './session.js?v=hub-sound-chain1';
 import {OUTPUT_GAIN_MIN_DB,OUTPUT_GAIN_MAX_DB} from './output-gain.js?v=20261108-relative-gain1';
 import {renderJob} from './renderer.js?v=20261106-level2';
-import {connectSourceEditor} from './source-ui.js?v=20261108-tooltip-language1';
+import {connectSourceEditor} from './source-ui.js?v=hub-sound-chain1';
 import {readAudioFile,validateAudioBuffer} from '../labs/audio/src/audio-import.js';
 import {summarizeChannels,peakOf,paintWaveform} from '../labs/audio/src/waveform-view.js';
 import {analyzeSourceColors} from '../labs/audio/src/source-colors.js';
@@ -30,9 +30,14 @@ function updateOutputGain(){
  outputGain.style.setProperty('--gain-start',`${Math.min(50,position)}%`);
  outputGain.style.setProperty('--gain-end',`${Math.max(50,position)}%`);
 }
-outputGain.oninput=()=>{updateOutputGain();currentBridge()?.meter?.setGainDb(outputGain.valueAsNumber);};
+outputGain.oninput=()=>{
+ updateOutputGain();
+ currentBridge()?.meter?.setGainDb(outputGain.valueAsNumber);
+ refreshDraft();
+ renderControls();
+};
 let active='audio',lastId=null,packet=null,peaks=[],colorsData=null,zoom=1,viewStart=0,waveHeight=180,frameHeight=430,ready=false,syncSerial=0,workspace={byLab:{},active:'audio',grainChannel:'mix'},dirty=false,assetLoading=false,editorFailure=null,sourceCursor=0,lastBusy=false,controlBlocked=true;
-let editorLoadController=null;
+let editorLoadController=null,entrySignature=null,entryStageId=null,switching=false,irAssetSerial=0;
 const records=new Map();const session=new HubSession(renderJob,render);
 const currentBridge=()=>ready?records.get(active)?.frame.contentWindow.hubBridge:null;
 const transport=new NativeTransport({bridge:currentBridge,blocked:()=>session.job?'Processing…':eligibility(),changed:()=>{renderControls();updateTransport();},error:showError});
@@ -42,7 +47,33 @@ const overviewPaint=createSourceOverview($('overview-canvas'));
 const signature=s=>JSON.stringify(s,(key,value)=>ArrayBuffer.isView(value)?{type:value.constructor.name,length:value.length}:value instanceof ArrayBuffer?{bytes:value.byteLength}:value);
 const title=s=>s[0].toUpperCase()+s.slice(1),fmt=n=>{const min=Math.floor(n/60),sec=(n%60).toFixed(2).padStart(5,'0');return String(min).padStart(2,'0')+':'+sec};
 function showError(e){session.status=e.message||String(e);session.error=session.status;session.emit();}
-function saveWorkspace(){if(ready&&records.get(active)?.frame.contentWindow.hubBridge){workspace.byLab[active]=records.get(active).frame.contentWindow.hubBridge.snapshot();workspace.active=active;workspace.dirtyByLab??={};workspace.dirtyByLab[active]=dirty;workspace.grainChannel=$('grain-channel').value;}if(session.current)session.current.workspace=structuredClone(workspace);}
+function saveWorkspace(){if(ready&&records.get(active)?.frame.contentWindow.hubBridge){workspace.byLab[active]=records.get(active).frame.contentWindow.hubBridge.snapshot();workspace.active=active;workspace.grainChannel=$('grain-channel').value;}if(session.current)session.current.workspace=structuredClone(workspace);}
+function processingSignature(lab,spec,snapshot){
+ if(lab==='timbre'){
+  const {settings,curves}=spec;
+  const activeCurves=Object.entries(curves).filter(([name])=>settings.chainOrder.some(effect=>name.startsWith(effect)));
+  return signature({settings,curves:activeCurves});
+ }
+ if(lab==='space'){
+  const {direction,distance,format,bypassed,roomSettings}=spec;
+  return signature({direction,directionEnabled:snapshot.extra.effectEnabled.direction,
+   distance:bypassed?null:distance,format,room:roomSettings.enabled?roomSettings:null});
+ }
+ if(lab!=='oscillator')return signature(spec);
+ // Analysis, level matching and the derived IR length are engine state.
+ const {analysisResult,impulseRevision,tailSeconds,curves,convolutionEnabled,convolutionWet,...settings}=spec.settings;
+ if(settings.soundMode==='resynthesis'){
+  const {basePitch,...otherCurves}=curves;
+  return signature({mode:settings.soundMode,duration:settings.durationSeconds,
+   partials:snapshot.dom.partialCountSelect.value,curves:otherCurves,
+   basePitch:snapshot.extra.editedCurves.basePitch?basePitch:null});
+ }
+ return signature({settings,curves,ir:convolutionEnabled&&convolutionWet>0
+  ? [workspace.irAssetId,snapshot.extra.appliedImpulsePercent,convolutionWet] : null});
+}
+function refreshDraft(){
+ dirty=records.get(active)?.processingSignature!==entrySignature||outputGain.valueAsNumber!==0;
+}
 async function getFrame(lab){
  if(records.has(lab))return records.get(lab).promise;
  const frame=document.createElement('iframe');frame.title=title(lab)+' curve editor';frame.hidden=lab!==active;
@@ -89,8 +120,10 @@ async function syncEditor(){
   rec.frame.contentDocument.body.dataset.hubLab=lab;
   const bridge=rec.frame.contentWindow.hubBridge,snap=bridge.snapshot();
   workspace.byLab[lab]=snap;rec.signature=signature(snap);
-  rec.processingSignature=signature({spec:bridge.spec(),asset:snap.extra?.impulseRevision});
-  ready=true;dirty=!!workspace.dirtyByLab?.[lab];
+  ready=true;
+  rec.processingSignature=processingSignature(lab,currentSpec(),snap);
+  entrySignature??=rec.processingSignature;
+  refreshDraft();
   if(previousFailure&&session.error===previousFailure.message){session.error="";session.status="Editor ready · Current input retained";session.emit();}
   fitEditor();renderControls();
  }catch(e){if(token!==syncSerial)return;ready=false;editorFailure=e;showError(e);}
@@ -130,7 +163,7 @@ function layoutEditors(){
  }finally{layoutRunning=false;}
 }
 
-function onCurrent(v){void stopPlayback();sourceCursor=0;lastId=v.current?.inputId;packet=session.packet();workspace=structuredClone(session.current?.workspace||{});workspace.byLab??={};active=workspace.active||active;workspace.active=active;workspace.grainChannel=granularSourceMode(workspace.grainChannel);$('grain-channel').value=workspace.grainChannel;zoom=1;viewStart=0;colorsData=null;peaks=packet?.channels[0].length?summarizeChannels(packet.channels):[];if(packet?.channels[0].length){const id=lastId;analyzeSourceColors({sampleRate:packet.sampleRate,length:packet.channels[0].length,numberOfChannels:packet.channels.length,getChannelData:i=>packet.channels[i]},data=>{if(lastId===id){colorsData=data;draw();}});}syncEditor();}
+function onCurrent(v){if(v.current?.id!==entryStageId){entryStageId=v.current?.id;entrySignature=null;}void stopPlayback();sourceCursor=0;lastId=v.current?.inputId;packet=session.packet();workspace=structuredClone(session.current?.workspace||{});workspace.byLab??={};active=workspace.active||active;workspace.active=active;workspace.grainChannel=granularSourceMode(workspace.grainChannel);$('grain-channel').value=workspace.grainChannel;zoom=1;viewStart=0;colorsData=null;peaks=packet?.channels[0].length?summarizeChannels(packet.channels):[];if(packet?.channels[0].length){const id=lastId;analyzeSourceColors({sampleRate:packet.sampleRate,length:packet.channels[0].length,numberOfChannels:packet.channels.length,getChannelData:i=>packet.channels[i]},data=>{if(lastId===id){colorsData=data;draw();}});}syncEditor();}
 function render(v){if(v.activeJob&&!lastBusy)void stopPlayback();lastBusy=v.activeJob;if(v.current?.inputId!==lastId)onCurrent(v);sourceUI.render(v);$('input-name').textContent=packet?.name||v.current?.label||'Loading audio…';$('input-name').title=$('input-name').textContent;$('metadata').textContent=v.current?`${v.current.channels}ch · 48 kHz`:'';$('length').textContent=v.current?fmt(v.current.frames/48000):'';paintStatus(v.status,v.activeJob);$('import-error').hidden=!v.error;$('import-error').textContent=v.error;$('cancel').hidden=!v.activeJob;$('progress').hidden=!v.activeJob;$('progress').value=v.progress;$('frame-block').hidden=!v.activeJob;$('frame-block').textContent=v.status;renderSavedHistory($('history'),v,{names,colors,disabled:assetLoading||v.activeJob,select:id=>{if(id!==session.current?.id){saveWorkspace();stopPlayback();session.restore(id)}},remove:id=>{if(ready&&!sourceUI.busy&&!assetLoading&&!currentBridge()?.busy?.())session.deleteSelectedStage(id)},undoRemove:undoStageDeletion,redoRemove:redoStageDeletion});renderControls();draw();}
 function eligibility(){const v=session.view();if(sourceUI.busy)return 'Applying source volume…';if(assetLoading)return 'Loading separate IR…';if(ready&&records.get(active)?.frame.contentWindow.hubBridge?.busy?.())return 'Preparing analysis or IR…';if(!ready)return editorFailure?.message||'Loading editor…';if(!v.current?.frames)return 'Open audio to begin';if(v.current.frames<4)return 'At least four source frames are required.';if(v.current.channels!==2)return 'Stereo input required; no automatic downmix.';const spec=records.get(active).frame.contentWindow.hubBridge.spec();if((spec.format&&spec.format!=='stereo')||(spec.settings?.format&&spec.settings.format!=='stereo'))return 'This integration currently supports stereo handoff. Choose Stereo 2ch.';if(active==='granular'&&!['mix','0','1'].includes($('grain-channel').value))return 'Choose Mono mix, Left or Right.';if(active==='oscillator'&&spec.settings.soundMode==='resynthesis'&&!spec.settings.analysisResult)return 'Analyzing current input…';return '';}
 function renderControls(){
@@ -170,15 +203,33 @@ async function prepareTarget(lab,candidate,valid,signal){
 }
 async function switchLab(lab){
  if(!names.includes(lab))throw new Error('Unknown Lab');
+ if(switching||session.job||assetLoading||sourceUI.dragging||currentBridge()?.busy?.())return false;
  if(lab===active){if(!ready)await syncEditor();return false;}
- if(session.job||assetLoading||currentBridge()?.busy?.())return false;
  const blocked=eligibility();if(blocked){showError(new Error(blocked));return false;}
  const from=active,inputId=session.working?.id;
  const sameInput=()=>ready&&active===from&&session.working?.id===inputId&&!session.job&&!sourceUI.busy;
- await stopPlayback();if(!sameInput())return false;
- await currentBridge().prepareOutput?.();if(!sameInput())return false;
- saveWorkspace();const spec=currentSpec();
- return session.handoff(from,spec,workspace,lab,(candidate,valid,signal)=>prepareTarget(lab,candidate,valid,signal),{outputGainDb:outputGain.valueAsNumber});
+ let transition,saveStage;
+ switching=true;
+ try{
+  await stopPlayback();if(!sameInput())return false;
+  // Read the final values even if the Lab's change notification is still queued.
+  const bridge=currentBridge(),spec=currentSpec(),snap=bridge.snapshot();
+  const outputGainDb=outputGain.valueAsNumber;
+  saveStage=outputGainDb!==0||processingSignature(from,spec,snap)!==entrySignature;
+  if(saveStage&&bridge.prepareOutput){
+   await bridge.prepareOutput();if(!sameInput())return false;
+  }
+  saveWorkspace();
+  transition=session.handoff(from,saveStage?currentSpec():null,workspace,lab,
+   (candidate,valid,signal)=>prepareTarget(lab,candidate,valid,signal),{outputGainDb});
+ }finally{switching=false;}
+ const moved=await transition;
+ if(moved&&!saveStage){
+  workspace=structuredClone(session.current.workspace);
+  active=lab;entrySignature=null;
+  await syncEditor();
+ }
+ return moved;
 }
 for (const [index, lab] of names.entries()) {
  const button = document.createElement('button');
@@ -189,11 +240,27 @@ for (const [index, lab] of names.entries()) {
  $('labs').append(button);
  controlHelp.registerLabTab(button, lab);
 }
-window.addEventListener('message',e=>{if(e.origin!==location.origin)return;const rec=records.get(active);if(e.source!==rec?.frame.contentWindow)return;if(e.data?.hub==='activity'){renderControls();return;}if(e.data?.hub==='play'){togglePlay();return;}if(e.data?.hub==='changed'&&ready&&!session.job){const snap=rec.frame.contentWindow.hubBridge.snapshot(),key=signature(snap);if(key!==rec.signature){rec.signature=key;workspace.byLab[active]=snap;const processing=signature({spec:rec.frame.contentWindow.hubBridge.spec(),asset:snap.extra?.impulseRevision}),changed=processing!==rec.processingSignature;rec.processingSignature=processing;if(changed)dirty=true;saveWorkspace();fitEditor();if(changed){session.touch();session.status='Live settings updated';session.emit();}else renderControls();}}});
+window.addEventListener('message',e=>{
+ if(e.origin!==location.origin)return;
+ const rec=records.get(active);
+ if(e.source!==rec?.frame.contentWindow)return;
+ if(e.data?.hub==='activity'){renderControls();return;}
+ if(e.data?.hub==='play'){togglePlay();return;}
+ if(e.data?.hub!=='changed'||!ready||session.job)return;
+ const snap=currentBridge().snapshot(),key=signature(snap);
+ if(key===rec.signature)return;
+ rec.signature=key;
+ const processing=processingSignature(active,currentSpec(),snap);
+ const changed=processing!==rec.processingSignature;
+ rec.processingSignature=processing;
+ refreshDraft();saveWorkspace();fitEditor();
+ if(changed){session.touch();session.status='Live settings updated';session.emit();}
+ else renderControls();
+});
 function currentSpec(){const spec=currentBridge().spec();if(active==='granular')spec.sourceChannel=granularSourceMode($('grain-channel').value);return spec;}
 async function run(){const blocked=eligibility();if(blocked){showError(new Error(blocked));return false;}await stopPlayback();await currentBridge()?.prepareOutput?.();saveWorkspace();return session.run(active,currentSpec(),workspace,false);}
 $('retry-editor').onclick=()=>syncEditor();
-$('cancel').onclick=()=>{void stopPlayback();session.cancel()};$('grain-channel').onchange=async()=>{dirty=true;saveWorkspace();await stopPlayback();session.touch();await syncEditor()};$('open-ir').onclick=()=>$('ir-file').click();$('ir-file').onchange=async()=>{const file=$('ir-file').files[0];if(!file)return;assetLoading=true;stopPlayback();session.touch();renderControls();try{await records.get('oscillator').frame.contentWindow.hubBridge.loadIR(file);dirty=true;saveWorkspace();session.status='Separate IR ready · Resynthesis source unchanged';}catch(e){showError(e)}finally{assetLoading=false;$('ir-file').value='';session.emit();fitEditor();}};
+$('cancel').onclick=()=>{void stopPlayback();session.cancel()};$('grain-channel').onchange=async()=>{saveWorkspace();await stopPlayback();session.touch();await syncEditor()};$('open-ir').onclick=()=>$('ir-file').click();$('ir-file').onchange=async()=>{const file=$('ir-file').files[0];if(!file)return;assetLoading=true;stopPlayback();session.touch();renderControls();try{await records.get('oscillator').frame.contentWindow.hubBridge.loadIR(file);workspace.irAssetId=++irAssetSerial;const record=records.get(active);record.processingSignature=processingSignature(active,currentSpec(),currentBridge().snapshot());refreshDraft();saveWorkspace();session.status='Separate IR ready · Resynthesis source unchanged';}catch(e){showError(e)}finally{assetLoading=false;$('ir-file').value='';session.emit();fitEditor();}};
 async function stopPlayback(){await transport.stop();}
 function togglePlay(){if(!session.job&&!$('hub-info').open)void transport.toggle();}
 $('play').onclick=togglePlay;$('rewind').onclick=()=>void transport.seek(0);$('seek').oninput=()=>void transport.seek(Number($('seek').value)/1000);

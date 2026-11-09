@@ -126,14 +126,23 @@ export class HubSession{
    this.working=working;this.undoEdits=undo;this.redoEdits=redo;this.job=null;this.status='Source edit applied';this.emit();return true;
   }catch(e){if(this.job?.token!==token)return false;this.job=null;this.status=e.message;this.error=e.message;this.emit();return false;}
  }
- // Render and prepare the target while the previous stage remains authoritative.
+ // Prepare the target while the current work remains authoritative. A null spec passes the working audio through.
  async handoff(lab,spec,workspace,target,prepareTarget,{outputGainDb=0}={}){
   if(this.job||!this.current||!this.working.packet.channels[0].length)return false;
   this.current.workspace=clone(workspace);
-  const input=this.current,revision=this.revision,token=++this.serial;
-  const controller=new AbortController();this.job={token,cancel:()=>controller.abort()};this.progress=0;this.error='';this.status='Processing '+lab+' → '+target+'…';this.emit();
-  const valid=()=>this.job?.token===token&&this.current===input&&this.revision===revision;
+  const input=this.current,working=this.working,revision=this.revision,token=++this.serial;
+  const controller=new AbortController();this.job={token,cancel:()=>controller.abort()};this.progress=0;this.error='';this.status=spec?'Processing '+lab+' → '+target+'…':'Preparing '+target+'…';this.emit();
+  const valid=()=>this.job?.token===token&&this.current===input&&this.working===working&&this.revision===revision;
   try{
+   const nextWorkspace={active:target,byLab:{},grainChannel:workspace.grainChannel||'mix'};
+   if(!spec){
+    await prepareTarget({id:working.id,packet:working.packet,workspace:nextWorkspace},valid,controller.signal);
+    if(!valid())return false;
+    input.workspace=nextWorkspace;
+    this.preview=null;this.revision++;
+    this.job=null;this.progress=1;this.status=target[0].toUpperCase()+target.slice(1)+' ready · Working audio retained';
+    this.emit();return true;
+   }
    const job=this.renderer(lab,this.packet(),clone(spec),p=>{if(valid()){this.progress=p*.85;this.emit();}});
    controller.signal.addEventListener('abort',()=>job.cancel?.(),{once:true});
    if(controller.signal.aborted)job.cancel?.();
@@ -144,7 +153,6 @@ export class HubSession{
    this.status='Checking output level…';this.progress=.85;this.emit();
    const outputGain=await applyOutputGain(result.channels,outputGainDb,{signal:controller.signal});
    if(!valid())return false;
-   const nextWorkspace={active:target,byLab:{},grainChannel:workspace.grainChannel||'mix',dirtyByLab:{}};
    const candidate=this.make({...result,name:this.working.packet.name},lab[0].toUpperCase()+lab.slice(1)+' · '+(result.channels[0].length/48000).toFixed(2)+' s',input.id,nextWorkspace);
    candidate.renderSpec={lab,spec:clone(spec)};
    if(outputGain.requestedGainDb!==0||outputGain.limited)candidate.outputGain=outputGain;

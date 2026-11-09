@@ -126,5 +126,5 @@ export function connectSourceEditor(session,repaint,getView=()=>({start:0,end:se
   const p=points[selected];if(p){ctx.fillStyle='#191c20';ctx.fillRect(0,0,w,21);ctx.fillStyle='#e1e8ef';ctx.textAlign='left';ctx.fillText(`Source volume · ${volumeLabel(p.gain)} · ${(p.frame/(v.current.sampleRate||48000)).toFixed(3)} s`,8,12);}
   ctx.restore();
  }
- return {render,paint,get busy(){return pending;},get tool(){return latched?volumeTool:null;},setTool(tool){if(pending||gesture||!editable())return false;latched=tool!==null;volumeTool=tool||'pen';refresh();toolChanged(tool);return true;}};
+ return {render,paint,get busy(){return pending;},get dragging(){return !!gesture;},get tool(){return latched?volumeTool:null;},setTool(tool){if(pending||gesture||!editable())return false;latched=tool!==null;volumeTool=tool||'pen';refresh();toolChanged(tool);return true;}};
 }

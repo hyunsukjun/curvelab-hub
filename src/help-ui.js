@@ -1,4 +1,4 @@
-import {helpTranslations} from './help-translations.js?v=20261108-help-languages1';
+import {helpTranslations} from './help-translations.js?v=hub-sound-chain1';
 
 // English leads the menu. The other languages follow their English names.
 const languages = [
