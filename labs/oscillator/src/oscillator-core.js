@@ -77,52 +77,65 @@ export function parseMultipliers(text) {
   return values.length ? values.slice(0, 16) : [1, 1.5, 2, 2.5];
 }
 
-export function stackFrequencies(settings, t, sampleRate = TARGET_SAMPLE_RATE, deviationOverride = null) {
-  const count = clampCount(settings.count);
+export function stackFrequencies(settings, t, sampleRate = TARGET_SAMPLE_RATE, deviationOverride = null, prepared = null) {
+  const count = prepared?.count ?? clampCount(settings.count);
   const base = effectiveBaseFrequency(settings, t);
-  const stack = settings.stack || "unison";
-  const multipliers = parseMultipliers(settings.multiplierText);
+  const stack = prepared?.stack ?? (settings.stack || "unison");
+  const multipliers = stack === "multiplier" ? prepared?.multipliers ?? parseMultipliers(settings.multiplierText) : null;
   const deviationNorm = deviationOverride ?? deviationAmountFromCurveY(valueAt(settings.curves?.deviation, t));
   const slopeDb = slopeDbFromNorm(valueAt(settings.curves?.slope, t));
   const nyquist = sampleRate * 0.48;
-  const voices = [];
+  const voices = prepared?.voices ?? [];
+  if (prepared) {
+    if (prepared.base === base && prepared.deviation === deviationNorm && prepared.slopeDb === slopeDb) return voices;
+    prepared.base = base;
+    prepared.deviation = deviationNorm;
+    prepared.slopeDb = slopeDb;
+    voices.length = 0;
+  }
 
   for (let index = 0; index < count; index += 1) {
-    const centered = count <= 1 ? 0 : ((index / (count - 1)) * 2) - 1;
+    const slot = prepared?.slots[index];
     let multiplier = 1;
     let label = "1";
 
     if (stack === "harmonic" || stack === "odd") {
       multiplier = stack === "odd" ? (2 * index) + 1 : index + 1;
-      const bend = partialDeviationFromNorm(deviationNorm) * harmonicBend(index);
+      const bend = partialDeviationFromNorm(deviationNorm) * (slot?.bend ?? harmonicBend(index));
       multiplier = Math.max(0.125, multiplier + bend);
-      label = String(stack === "odd" ? (2 * index) + 1 : index + 1);
+      if (!slot) label = String(stack === "odd" ? (2 * index) + 1 : index + 1);
     } else if (stack === "multiplier") {
       const baseMultiple = multipliers[index % multipliers.length];
-      const bend = partialDeviationFromNorm(deviationNorm) * multiplierBend(index);
+      const bend = partialDeviationFromNorm(deviationNorm) * (slot?.bend ?? multiplierBend(index));
       multiplier = Math.max(0.125, baseMultiple + bend);
-      label = baseMultiple.toFixed(baseMultiple % 1 === 0 ? 0 : 3).replace(/0+$/, "").replace(/\.$/, "");
+      if (!slot) label = baseMultiple.toFixed(baseMultiple % 1 === 0 ? 0 : 3).replace(/0+$/, "").replace(/\.$/, "");
     } else {
+      const centered = slot?.centered ?? (count <= 1 ? 0 : ((index / (count - 1)) * 2) - 1);
       const cents = centered * centsFromNorm(deviationNorm);
       multiplier = Math.pow(2, cents / 1200);
-      label = `${Math.round(cents)}c`;
+      if (!slot) label = `${Math.round(cents)}c`;
     }
 
     const frequency = base * multiplier;
     if (frequency >= nyquist) continue;
     const octave = Math.log2(Math.max(1e-6, frequency / base));
     const slopeGain = Math.pow(10, (slopeDb * octave) / 20);
-    voices.push({
+    const amplitude = clamp(slopeGain, 0.03, 1.8);
+    if (slot) {
+      slot.frequency = frequency;
+      slot.amplitude = amplitude;
+      voices.push(slot);
+    } else voices.push({
       index,
       label,
       multiplier,
       frequency,
-      amplitude: clamp(slopeGain, 0.03, 1.8),
+      amplitude,
       phaseOffset: index / count
     });
   }
 
-  return normalizeVoices(voices, stack);
+  return normalizeVoices(voices, stack, Boolean(prepared));
 }
 
 export function effectiveBaseFrequency(settings, t) {
@@ -260,13 +273,17 @@ function multiplierBend(index) {
   return Math.cos((index + 1) * 2.137) * 0.45;
 }
 
-function normalizeVoices(voices, stack = "harmonic") {
+function normalizeVoices(voices, stack = "harmonic", reuse = false) {
   if (!voices.length) return [];
   const sum = voices.reduce((total, voice) => total + Math.abs(voice.amplitude), 0);
   const count = voices.length;
   const countLift = stack === "unison" ? Math.sqrt(count)
     : stack === "multiplier" ? Math.pow(count, 0.25) : 1;
   const scale = 0.82 * countLift / Math.max(1, sum);
+  if (reuse) {
+    for (const voice of voices) voice.amplitude *= scale;
+    return voices;
+  }
   return voices.map((voice) => ({ ...voice, amplitude: voice.amplitude * scale }));
 }
 
@@ -278,6 +295,28 @@ export function voicePan(index, count, stack = "unison") {
     return index < 8 ? 0 : (index % 2 === 0 ? -1 : 1);
   }
   return ((index / (count - 1)) * 2) - 1;
+}
+
+// Each offline stack render owns its voice slots. Pan depends on how many
+// voices survive Nyquist culling as well as each voice's original index.
+export function prepareStackRender(settings) {
+  if (settings.soundMode === 'resynthesis') return null;
+  const count = clampCount(settings.count);
+  const stack = settings.stack || "unison";
+  const multipliers = stack === "multiplier" ? parseMultipliers(settings.multiplierText) : null;
+  const slots = Array.from({ length: count }, (_, index) => ({
+    index,
+    phaseOffset: index / count,
+    centered: count <= 1 ? 0 : ((index / (count - 1)) * 2) - 1,
+    bend: stack === "multiplier" ? multiplierBend(index) : harmonicBend(index),
+    gains: Array.from({ length: count + 1 }, (_, audibleCount) => {
+      const angle = (voicePan(index, audibleCount, stack) + 1) * Math.PI * 0.25;
+      return [Math.cos(angle), Math.sin(angle)];
+    }),
+    frequency: 0,
+    amplitude: 0
+  }));
+  return { count, stack, multipliers, slots, voices: [], base: null, deviation: null, slopeDb: null };
 }
 
 export function createSmoothingState() {
@@ -305,15 +344,15 @@ function writeString(view, offset, value) {
   }
 }
 
-export function renderFrame(settings, t, sampleRate, phases, modPhases, smoothingState = null) {
+export function renderFrame(settings, t, sampleRate, phases, modPhases, smoothingState = null, prepared = null) {
   if (smoothingState && smoothingState.stack !== settings.stack) {
     smoothingState.deviation = null;
     smoothingState.stack = settings.stack;
   }
   const deviationTarget = deviationAmountFromCurveY(valueAt(settings.curves?.deviation, t));
   const deviation = smoothValue(smoothingState, "deviation", deviationTarget, 8, sampleRate);
-  if (settings.soundMode === 'resynthesis') return renderResynthesisFrame(settings, t, sampleRate, phases, deviation);
-  const voices = stackFrequencies(settings, t, sampleRate, deviation);
+  if (settings.soundMode === 'resynthesis') return renderResynthesisFrame(settings, t, sampleRate, phases, deviation, prepared);
+  const voices = stackFrequencies(settings, t, sampleRate, deviation, prepared);
   const mode = settings.modulationMode || "off";
   if (smoothingState && smoothingState.mode !== mode) {
     smoothingState.amount = smoothingState.mode === null ? null : 0;
@@ -326,15 +365,15 @@ export function renderFrame(settings, t, sampleRate, phases, modPhases, smoothin
   let right = 0;
 
   for (const voice of voices) {
-    const pan = voicePan(voice.index, voices.length, settings.stack || "unison");
     const phase = (phases[voice.index] + voice.phaseOffset) % 1;
     const modPhase = (modPhases[voice.index] + voice.phaseOffset) % 1;
     const sample = modulatedOscillatorSample(
       settings.waveform, phase, modPhase, mode, amount, voice.frequency, ratio, sampleRate
     ) * voice.amplitude;
-    const angle = (pan + 1) * Math.PI * 0.25;
-    left += sample * Math.cos(angle);
-    right += sample * Math.sin(angle);
+    const gains = voice.gains?.[voices.length];
+    const angle = gains ? 0 : (voicePan(voice.index, voices.length, settings.stack || "unison") + 1) * Math.PI * 0.25;
+    left += sample * (gains ? gains[0] : Math.cos(angle));
+    right += sample * (gains ? gains[1] : Math.sin(angle));
     phases[voice.index] = (phases[voice.index] + (voice.frequency / sampleRate)) % 1;
     modPhases[voice.index] = (modPhases[voice.index] + ((voice.frequency * ratio) / sampleRate)) % 1;
   }
@@ -380,31 +419,74 @@ export function resynthesisNyquistGain(frequency, sampleRate) {
   return 1 - x * x * (3 - 2 * x);
 }
 
-function renderResynthesisFrame(settings, t, sampleRate, phases, deviationOverride = null) {
+// A render uses one immutable settings snapshot. Keep per-partial constants and
+// reuse the last coefficients while the curves are flat.
+export function prepareResynthesisRender(settings) {
+  const result = settings.analysisResult;
+  if (settings.soundMode !== 'resynthesis' || !result?.partials?.length) return null;
+  const reference = clamp(result.fundamentalEstimate, MIN_BASE_FREQUENCY, MAX_BASE_FREQUENCY);
+  const partials = result.partials.map(partial => {
+    const index = partial.index - 1;
+    const angle = (resynthesisPan(index, result.partials.length) + 1) * Math.PI * 0.25;
+    return {
+      ratio: partial.frequency / reference,
+      bend: harmonicBend(index),
+      left: Math.cos(angle),
+      right: Math.sin(angle),
+      increment: 0,
+      amplitude: null
+    };
+  });
+  return { partials, base: null, deviation: null, slopeDb: null };
+}
+
+function renderResynthesisFrame(settings, t, sampleRate, phases, deviationOverride = null, prepared = null) {
   const result = settings.analysisResult;
   if (!result?.partials?.length) return { left: 0, right: 0, voices: 0 };
   const base = effectiveBaseFrequency(settings, t);
-  const reference = clamp(result.fundamentalEstimate, MIN_BASE_FREQUENCY, MAX_BASE_FREQUENCY);
+  const reference = prepared ? 0 : clamp(result.fundamentalEstimate, MIN_BASE_FREQUENCY, MAX_BASE_FREQUENCY);
   const deviation = partialDeviationFromNorm(deviationOverride ?? deviationAmountFromCurveY(valueAt(settings.curves?.deviation, t)));
   const slopeDb = slopeDbFromNorm(valueAt(settings.curves?.slope, t));
   let left = 0;
   let right = 0;
   let totalAmplitude = 0;
   let count = 0;
-  for (const partial of result.partials) {
+  const reuse = prepared && prepared.base === base && prepared.deviation === deviation && prepared.slopeDb === slopeDb;
+  if (prepared && !reuse) {
+    prepared.base = base;
+    prepared.deviation = deviation;
+    prepared.slopeDb = slopeDb;
+  }
+  for (let i = 0; i < result.partials.length; i++) {
+    const partial = result.partials[i];
     const index = partial.index - 1;
-    const frequency = base * Math.max(0.125, partial.frequency / reference + deviation * harmonicBend(index));
+    const constants = prepared?.partials[i];
+    let increment, amplitude;
+    if (reuse) {
+      ({ increment, amplitude } = constants);
+    } else {
+      const ratio = constants ? constants.ratio : partial.frequency / reference;
+      const bend = constants ? constants.bend : harmonicBend(index);
+      const frequency = base * Math.max(0.125, ratio + deviation * bend);
+      increment = frequency / sampleRate;
+      const nyquistGain = resynthesisNyquistGain(frequency, sampleRate);
+      amplitude = null;
+      if (nyquistGain > 0) {
+        const slope = Math.pow(10, slopeDb * Math.log2(Math.max(1e-6, frequency / base)) / 20);
+        amplitude = partial.relativeAmplitude * clamp(slope, 0.03, 1.8) * nyquistGain;
+      }
+      if (constants) {
+        constants.increment = increment;
+        constants.amplitude = amplitude;
+      }
+    }
     const phase = phases[index];
-    phases[index] = (phase + frequency / sampleRate) % 1;
-    const nyquistGain = resynthesisNyquistGain(frequency, sampleRate);
-    if (nyquistGain <= 0) continue;
-    const slope = Math.pow(10, slopeDb * Math.log2(Math.max(1e-6, frequency / base)) / 20);
-    const amplitude = partial.relativeAmplitude * clamp(slope, 0.03, 1.8) * nyquistGain;
-    const pan = resynthesisPan(index, result.partials.length);
-    const angle = (pan + 1) * Math.PI * 0.25;
+    phases[index] = (phase + increment) % 1;
+    if (amplitude === null) continue;
+    const angle = constants ? 0 : (resynthesisPan(index, result.partials.length) + 1) * Math.PI * 0.25;
     const sample = Math.sin(2 * Math.PI * phase) * amplitude;
-    left += sample * Math.cos(angle);
-    right += sample * Math.sin(angle);
+    left += sample * (constants ? constants.left : Math.cos(angle));
+    right += sample * (constants ? constants.right : Math.sin(angle));
     totalAmplitude += Math.abs(amplitude);
     count += 1;
   }

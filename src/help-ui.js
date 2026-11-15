@@ -1,4 +1,4 @@
-import {helpTranslations} from './help-translations.js?v=hub-continue-output1';
+import {helpTranslations} from './help-translations.js?v=hub-live-edits1';
 
 // English leads the menu. The other languages follow their English names.
 const languages = [

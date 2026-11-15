@@ -1,4 +1,4 @@
-import {applyOutputGain} from './output-gain.js?v=20261108-relative-gain1';
+import {measureOutputPeak,outputGainForPeak,scaleOutput} from './output-gain.js?v=hub-live-edits1';
 import {VOLUME_MAX_GAIN,VOLUME_MAX_POINTS} from '../labs/audio/src/source-volume.js?v=20261028-volume-line1';
 import {initialEdit,lengthOf,deleteRange,setFade,materialize} from '../labs/audio/src/output-edit-core.js';
 const clone=x=>structuredClone(x),copy=p=>({...p,referenceBlob:undefined,channels:p.channels.map(c=>c.slice())});
@@ -143,6 +143,16 @@ export class HubSession{
   }catch(e){if(this.job?.token!==token)return false;this.job=null;this.status=e.message;this.error=e.message;this.emit();return false;}
  }
  async prepareOutput(lab,input,spec,outputGainDb,signal,onProgress=()=>{}){
+  const base=await this.prepareOutputBase(lab,input,spec,signal,onProgress);
+  return this.finishOutput(base,outputGainDb,signal);
+ }
+ async finishOutput({packet,peak},outputGainDb,signal,{preserve=false}={}){
+  const {gain,outputGain}=outputGainForPeak(peak,outputGainDb);
+  if(preserve&&gain!==1)packet=copy(packet);
+  await scaleOutput(packet.channels,gain,signal);
+  return {packet,outputGain};
+ }
+ async prepareOutputBase(lab,input,spec,signal,onProgress=()=>{}){
   signal.throwIfAborted();
   const job=this.renderer(lab,copy(input),clone(spec),progress=>onProgress(progress*.85));
   const cancel=()=>job.cancel?.();
@@ -153,8 +163,8 @@ export class HubSession{
    await this.validate(result,false,{checkSamples:false});
    if(result.channels.length!==2)throw new Error('Hub output requires stereo; current stage retained.');
    onProgress(.85,'Checking output level…');
-   const outputGain=await applyOutputGain(result.channels,outputGainDb,{signal});
-   return {packet:{...result,referenceBlob:undefined,name:input.name},outputGain};
+   const peak=await measureOutputPeak(result.channels,signal);
+   return {packet:{...result,referenceBlob:undefined,name:input.name},peak};
   }finally{signal.removeEventListener('abort',cancel);}
  }
  // Prepare the target while the current work remains authoritative. A null spec passes the working audio through.
@@ -181,7 +191,9 @@ export class HubSession{
     this.job=null;this.progress=1;this.status=target[0].toUpperCase()+target.slice(1)+' ready · Working audio retained';
     this.emit();return true;
    }
-   const {packet:result,outputGain}=prepared??await this.prepareOutput(lab,working.packet,spec,outputGainDb,controller.signal,(progress,status)=>{
+   const {packet:result,outputGain}=prepared
+    ? await this.finishOutput(prepared,outputGainDb,controller.signal,{preserve:true})
+    : await this.prepareOutput(lab,working.packet,spec,outputGainDb,controller.signal,(progress,status)=>{
     if(!valid())return;
     this.progress=progress;
     if(status)this.status=status;

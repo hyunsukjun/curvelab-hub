@@ -16,7 +16,7 @@ import {
 export const RENDER_SAMPLE_RATE = 48000;
 export const RENDER_BIT_DEPTH = 24;
 
-export async function renderGranular({ audioBuffer, curves, settings, signal, onProgress }) {
+export async function renderGranular({ audioBuffer, curves, settings, signal, onProgress, pcmOnly = false }) {
   const sampleRate = RENDER_SAMPLE_RATE;
   const sourceSampleRate = audioBuffer.sampleRate;
   const source = audioBuffer.getChannelData(0);
@@ -30,45 +30,44 @@ export async function renderGranular({ audioBuffer, curves, settings, signal, on
   const rangeStart = clamp(Math.min(settings.rangeStart, settings.rangeEnd));
   const rangeEnd = clamp(Math.max(settings.rangeStart, settings.rangeEnd));
   const rangeSeconds = Math.max(1 / sourceSampleRate, (rangeEnd - rangeStart) * audioBuffer.duration);
-  let nextGrain = 0;
+  // Half-open Source Window; interpolation taps cannot borrow outside samples.
+  const minRead = Math.ceil(rangeStart * source.length);
+  const lastRead = Math.min(source.length - 1, Math.ceil(rangeEnd * source.length) - 1);
+  let frame = 0;
   let grainIndex = 0;
   let lastProgress = 0;
   let lastYield = performance.now();
 
-  for (let frame = 0; frame < frameCount; frame += 1) {
+  while (frame < frameCount) {
     if (signal?.aborted) throw new DOMException("Render cancelled", "AbortError");
-    const t = frameCount <= 1 ? 0 : frame / (frameCount - 1);
+    const t = frame / (frameCount - 1);
+    // The interval is fixed when each grain starts.
     const density = densityFromNorm(valueAt(curves.density, t));
     const interval = Math.max(1, Math.round(sampleRate / density));
-    while (nextGrain <= 0) {
-      const requestedMs = grainMsFromNorm(valueAt(curves.size, t));
-      let lengthSamples = Math.max(16, Math.round(Math.min(requestedMs / 1000, rangeSeconds) * sampleRate));
-      const position = rangeStart + ((rangeEnd - rangeStart) * clamp(valueAt(curves.position, t)));
-      const spread = clamp(valueAt(curves.spread, t)) * (rangeEnd - rangeStart);
-      const sourceCenter = clamp(position + ((random() - 0.5) * spread), rangeStart, rangeEnd) * source.length;
-      const [low, high] = pitchBounds(curves, t);
-      const semitone = low + ((high - low) * random());
-      const rate = Math.pow(2, semitone / 12) * (sourceSampleRate / sampleRate);
-      // Half-open Source Window; interpolation taps cannot borrow outside samples.
-      const minRead = Math.ceil(rangeStart * source.length);
-      const lastRead = Math.min(source.length - 1, Math.ceil(rangeEnd * source.length) - 1);
-      lengthSamples = Math.min(lengthSamples, Math.max(0, Math.floor((lastRead - minRead) / rate) + 1));
-      const readSpan = Math.max(0, lengthSamples - 1) * rate;
-      const maxRead = Math.max(minRead, lastRead - readSpan);
-      const start = clamp(sourceCenter - (readSpan * 0.5), minRead, maxRead);
-      writeGrain(output, source, frame, start, lengthSamples, rate, settings.envelope, grainIndex, channelCount, minRead, lastRead);
-      grainIndex += 1;
-      nextGrain += interval;
-    }
-    nextGrain -= 1;
+    const requestedMs = grainMsFromNorm(valueAt(curves.size, t));
+    let lengthSamples = Math.max(16, Math.round(Math.min(requestedMs / 1000, rangeSeconds) * sampleRate));
+    const position = rangeStart + ((rangeEnd - rangeStart) * clamp(valueAt(curves.position, t)));
+    const spread = clamp(valueAt(curves.spread, t)) * (rangeEnd - rangeStart);
+    const sourceCenter = clamp(position + ((random() - 0.5) * spread), rangeStart, rangeEnd) * source.length;
+    const [low, high] = pitchBounds(curves, t);
+    const semitone = low + ((high - low) * random());
+    const rate = Math.pow(2, semitone / 12) * (sourceSampleRate / sampleRate);
+    lengthSamples = Math.min(lengthSamples, Math.max(0, Math.floor((lastRead - minRead) / rate) + 1));
+    const readSpan = Math.max(0, lengthSamples - 1) * rate;
+    const maxRead = Math.max(minRead, lastRead - readSpan);
+    const start = clamp(sourceCenter - (readSpan * 0.5), minRead, maxRead);
+    writeGrain(output, source, frame, start, lengthSamples, rate, settings.envelope, grainIndex, channelCount, minRead, lastRead);
+    grainIndex += 1;
+    frame += interval;
 
-    const progress = frame / frameCount;
+    const progress = Math.min(1, frame / frameCount);
     const now = performance.now();
     if (progress - lastProgress > 0.01 || now - lastYield > 60) {
       lastProgress = progress;
       lastYield = now;
       onProgress?.(progress);
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      // The Hub renders PCM in a dedicated worker and cancels by terminating it.
+      if (!pcmOnly || signal) await new Promise((resolve) => setTimeout(resolve, 0));
     }
   }
 
@@ -77,7 +76,7 @@ export async function renderGranular({ audioBuffer, curves, settings, signal, on
   onProgress?.(1);
   return {
     hubSamples: output,
-    blob: encodeWav(output, sampleRate, { bitDepth: RENDER_BIT_DEPTH, dither: true, ditherSeed: 48024 }),
+    blob: pcmOnly ? null : encodeWav(output, sampleRate, { bitDepth: RENDER_BIT_DEPTH, dither: true, ditherSeed: 48024 }),
     duration,
     channelCount,
     grains: grainIndex,
@@ -89,10 +88,11 @@ export async function renderGranular({ audioBuffer, curves, settings, signal, on
 function writeGrain(output, source, startFrame, readStart, lengthSamples, rate, envelope, grainIndex, channelCount, first, last) {
   const channel = balancedChannelFor(grainIndex, channelCount);
   const target = output[channel];
-  for (let i = 0; i < lengthSamples; i += 1) {
+  const end = Math.min(lengthSamples, target.length - startFrame);
+  const span = Math.max(1, lengthSamples - 1);
+  for (let i = 0; i < end; i += 1) {
     const frame = startFrame + i;
-    if (frame >= target.length) break;
-    const phase = i / Math.max(1, lengthSamples - 1);
+    const phase = i / span;
     target[frame] += readCubic(source, readStart + (i * rate), first, last) * envelopeValue(envelope, phase);
   }
 }

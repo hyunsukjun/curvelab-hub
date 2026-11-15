@@ -22,9 +22,7 @@ async function forSampleChunks(channels, signal, visit) {
 }
 
 // The handoff owns these rendered buffers. Apply one factor across all channels.
-export async function applyOutputGain(channels, requestedDb, {signal} = {}) {
-  if (!Number.isFinite(requestedDb)) throw new Error('Invalid output gain');
-  const requestedGainDb = Math.max(OUTPUT_GAIN_MIN_DB, Math.min(OUTPUT_GAIN_MAX_DB, requestedDb));
+export async function measureOutputPeak(channels, signal) {
   let peak = 0;
   await forSampleChunks(channels, signal, (channel, start, end) => {
     for (let i = start; i < end; i++) {
@@ -33,19 +31,34 @@ export async function applyOutputGain(channels, requestedDb, {signal} = {}) {
       if (magnitude > peak) peak = magnitude;
     }
   });
+  return peak;
+}
+
+export function outputGainForPeak(peak, requestedDb) {
+  if (!Number.isFinite(requestedDb)) throw new Error('Invalid output gain');
+  const requestedGainDb = Math.max(OUTPUT_GAIN_MIN_DB, Math.min(OUTPUT_GAIN_MAX_DB, requestedDb));
   const inputPeakDb = peakDb(peak);
   const skipped = requestedGainDb > 0 && peak <= NEAR_SILENT_PEAK;
   if (skipped) {
-    return {requestedGainDb, inputPeakDb, gainDb: 0, outputPeakDb: inputPeakDb, limited: false, skipped};
+    return {gain: 1, outputGain: {requestedGainDb, inputPeakDb, gainDb: 0, outputPeakDb: inputPeakDb, limited: false, skipped}};
   }
   const requestedGain = outputGainLinear(requestedGainDb);
   const gain = Math.min(requestedGain, OUTPUT_CEILING_PEAK / peak);
   const limited = gain < requestedGain;
+  const outputPeakDb = peakDb(Math.fround(peak * gain));
+  return {gain, outputGain: {requestedGainDb, inputPeakDb, gainDb: limited ? peakDb(gain) : requestedGainDb, outputPeakDb, limited, skipped}};
+}
+
+export async function scaleOutput(channels, gain, signal) {
   if (gain !== 1) {
     await forSampleChunks(channels, signal, (channel, start, end) => {
       for (let i = start; i < end; i++) channel[i] *= gain;
     });
   }
-  const outputPeakDb = peakDb(Math.fround(peak * gain));
-  return {requestedGainDb, inputPeakDb, gainDb: limited ? peakDb(gain) : requestedGainDb, outputPeakDb, limited, skipped};
+}
+
+export async function applyOutputGain(channels, requestedDb, {signal} = {}) {
+  const {gain, outputGain} = outputGainForPeak(await measureOutputPeak(channels, signal), requestedDb);
+  await scaleOutput(channels, gain, signal);
+  return outputGain;
 }
