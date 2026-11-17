@@ -227,7 +227,7 @@ export default {
   "hub.grainSource": "A mistura mono usa 50% do canal esquerdo e 50% do direito. Esquerdo e Direito usam apenas um canal de origem.",
   "hub.openIR": "Abre um arquivo separado para usar como resposta a impulso.",
   "hub.rewind": "Volta ao início da reprodução.",
-  "hub.play": "Use a barra de espaço para reproduzir ou pausar a mesma saída exportada em WAV.",
+  "hub.play": "Use a barra de espaço para reproduzir ou pausar a prévia estéreo.",
   "hub.gain": "Ajusta o ganho para reprodução, WAV e o próximo Lab. A saída processada é limitada a −1 dBFS.",
   "hub.clip": "Indicador de clipping na saída. Clique para redefinir.",
   "hub.fadeIn": "Arraste para ajustar a duração do fade-in.",

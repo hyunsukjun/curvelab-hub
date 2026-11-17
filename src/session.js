@@ -1,8 +1,10 @@
 import {measureOutputPeak,outputGainForPeak,scaleOutput} from './output-gain.js?v=hub-live-edits1';
 import {VOLUME_MAX_GAIN,VOLUME_MAX_POINTS} from '../labs/audio/src/source-volume.js?v=20261028-volume-line1';
 import {initialEdit,lengthOf,deleteRange,setFade,materialize} from '../labs/audio/src/output-edit-core.js';
+import {configuredOutputChannels,stereoOutput} from './channel-output.js?v=hub-channel-output1';
 const clone=x=>structuredClone(x),copy=p=>({...p,referenceBlob:undefined,channels:p.channels.map(c=>c.slice())});
 const MAX_EDIT_UNDO=30;
+const HISTORY_AUDIO_BYTES=256*1024*1024;
 export class HubSession{
  constructor(renderer,change=()=>{}){this.renderer=renderer;this.change=change;this.nodes=[];this.deletedStages=[];this.stageDeletionRedo=[];this.undoEdits=[];this.redoEdits=[];this.current=null;this.working=null;this.reopened=null;this.preview=null;this.job=null;this.serial=0;this.revision=0;this.restoreCount=0;this.status='Loading Bach Prelude…';this.error='';this.progress=0;}
  view(){
@@ -26,10 +28,11 @@ export class HubSession{
   for(const n of [...stages,...edits]){
    for(const source of [n,n.recipe]){
     source?.packet?.channels.forEach(c=>buffers.add(c.buffer));
+    source?.exportPacket?.channels.forEach(c=>buffers.add(c.buffer));
     source?.editState?.pieces.forEach(p=>p.channels.forEach(c=>buffers.add(c.buffer)));
    }
   }
-  if(stages.length>30||[...buffers].reduce((a,b)=>a+b.byteLength,0)>256*1024*1024)throw new Error('Session history limit reached. Export before starting a new session.');
+  if(stages.length>30||[...buffers].reduce((a,b)=>a+b.byteLength,0)>HISTORY_AUDIO_BYTES)throw new Error('Session history limit reached. Export before starting a new session.');
  }
  make(packet,label,parentId,workspace={}){const p=copy(packet);return {id:'stage-'+(++this.serial),label,parentId,packet:p,workspace:clone(workspace),selection:null,kind:'input',editState:p.channels.length===2&&p.channels[0].length?initialEdit(...p.channels,p.sampleRate):null};}
  publish(n){
@@ -146,14 +149,29 @@ export class HubSession{
   const base=await this.prepareOutputBase(lab,input,spec,signal,onProgress);
   return this.finishOutput(base,outputGainDb,signal);
  }
- async finishOutput({packet,peak},outputGainDb,signal,{preserve=false}={}){
+ async finishOutput({packet,exportPacket,peak},outputGainDb,signal,{preserve=false,wavOnly=false}={}){
   const {gain,outputGain}=outputGainForPeak(peak,outputGainDb);
+  if(wavOnly)packet=exportPacket||packet;
   if(preserve&&gain!==1)packet=copy(packet);
   await scaleOutput(packet.channels,gain,signal);
-  return {packet,outputGain};
+  if(exportPacket&&!wavOnly){
+   if(preserve&&gain!==1)exportPacket=copy(exportPacket);
+   await scaleOutput(exportPacket.channels,gain,signal);
+  }
+  return {packet,exportPacket,outputGain};
  }
  async prepareOutputBase(lab,input,spec,signal,onProgress=()=>{}){
   signal.throwIfAborted();
+  const channelCount=configuredOutputChannels(lab,spec);
+  if(!channelCount)throw new Error('Choose Stereo 2ch, Quad 4ch or Octo 8ch.');
+  if(channelCount>2){
+   const frames=lab==='granular'
+    ? Math.ceil(Math.min(600,Math.max(1,Number(spec.settings.durationSeconds??20)))*input.sampleRate)
+    : input.channels[0].length;
+   if(frames*(channelCount+2)*Float32Array.BYTES_PER_ELEMENT>HISTORY_AUDIO_BYTES){
+    throw new Error('Multichannel output exceeds the Hub audio limit. Shorten the audio or choose fewer output channels.');
+   }
+  }
   const job=this.renderer(lab,copy(input),clone(spec),progress=>onProgress(progress*.85));
   const cancel=()=>job.cancel?.();
   signal.addEventListener('abort',cancel,{once:true});
@@ -161,10 +179,12 @@ export class HubSession{
    const result=await job.promise;
    signal.throwIfAborted();
    await this.validate(result,false,{checkSamples:false});
-   if(result.channels.length!==2)throw new Error('Hub output requires stereo; current stage retained.');
+   if(result.channels.length!==channelCount)throw new Error('Rendered output does not match the selected channel count.');
    onProgress(.85,'Checking output level…');
    const peak=await measureOutputPeak(result.channels,signal);
-   return {packet:{...result,referenceBlob:undefined,name:input.name},peak};
+   const rendered={...result,referenceBlob:undefined,name:input.name};
+   const packet=await stereoOutput(rendered,lab,spec.format??spec.settings?.format,signal);
+   return {packet,exportPacket:channelCount>2?rendered:undefined,peak};
   }finally{signal.removeEventListener('abort',cancel);}
  }
  // Prepare the target while the current work remains authoritative. A null spec passes the working audio through.
@@ -191,7 +211,7 @@ export class HubSession{
     this.job=null;this.progress=1;this.status=target[0].toUpperCase()+target.slice(1)+' ready · Working audio retained';
     this.emit();return true;
    }
-   const {packet:result,outputGain}=prepared
+   const {packet:result,exportPacket,outputGain}=prepared
     ? await this.finishOutput(prepared,outputGainDb,controller.signal,{preserve:true})
     : await this.prepareOutput(lab,working.packet,spec,outputGainDb,controller.signal,(progress,status)=>{
     if(!valid())return;
@@ -201,7 +221,9 @@ export class HubSession{
    });
    if(!valid())return false;
    const parentId=reopened?input.parentId:input.id;
-   const candidate=this.make({...result,name:working.packet.name},lab[0].toUpperCase()+lab.slice(1)+' · '+(result.channels[0].length/48000).toFixed(2)+' s',parentId,nextWorkspace);
+   const formatLabel=exportPacket?` · ${exportPacket.channels.length}ch`:'';
+   const candidate=this.make(result,lab[0].toUpperCase()+lab.slice(1)+formatLabel+' · '+(result.channels[0].length/48000).toFixed(2)+' s',parentId,nextWorkspace);
+   if(exportPacket)candidate.exportPacket=exportPacket;
    candidate.renderSpec={lab,spec:clone(spec)};
    // The working input is immutable here. Keep it even if its parent is deleted.
    candidate.recipe={packet:working.packet,editState:working.editState,workspace:recipeWorkspace,outputGainDb,inputLabel};
@@ -225,5 +247,29 @@ export class HubSession{
    this.emit();return true;
   }catch(e){if(!valid())return false;this.job=null;this.error=e.message;this.status=e.message;this.emit();return false;}
  }
- async run(lab,spec,workspace,apply){if(this.job||!this.current||!this.working.packet.channels[0].length)return false;this.rememberWorkspace(workspace);const input=this.current,revision=this.revision,token=++this.serial;this.job={token};this.progress=0;this.error='';this.status=apply?'Applying…':'Preparing preview…';this.emit();const valid=()=>this.job?.token===token&&this.current===input&&this.revision===revision;try{const job=this.renderer(lab,this.packet(),clone(spec),p=>{if(valid()){this.progress=p;this.emit();}});this.job.cancel=job.cancel;const result=await job.promise;if(!valid())return false;await this.validate(result);if(!valid())return false;if(apply){const candidate=this.make(result,`${lab[0].toUpperCase()+lab.slice(1)} · ${result.channels[0].length/48000>=60?'':(result.channels[0].length/48000).toFixed(2)+' s'}`,input.id);candidate.renderSpec={lab,spec:clone(spec)};this.publish(candidate);this.status='Applied · Result is the next input';}else{this.preview={packet:copy(result),inputId:input.id,revision,lab,spec:clone(spec)};this.status='Preview ready · Input unchanged';}this.job=null;this.emit();return true;}catch(e){if(!valid())return false;this.job=null;this.error=e.message;this.status=e.message;this.emit();return false;}}
+ async run(lab,spec,workspace,apply){
+  if(this.job||!this.current||!this.working.packet.channels[0].length)return false;
+  this.rememberWorkspace(workspace);
+  const input=this.current,revision=this.revision,token=++this.serial,controller=new AbortController();
+  this.job={token,cancel:()=>controller.abort()};
+  this.progress=0;this.error='';this.status=apply?'Applying…':'Preparing preview…';this.emit();
+  const valid=()=>this.job?.token===token&&this.current===input&&this.revision===revision;
+  try{
+   const {packet,exportPacket}=await this.prepareOutputBase(lab,this.working.packet,spec,controller.signal,progress=>{
+    if(valid()){this.progress=progress;this.emit();}
+   });
+   if(!valid())return false;
+   if(apply){
+    const candidate=this.make(packet,`${lab[0].toUpperCase()+lab.slice(1)} · ${packet.channels[0].length/48000>=60?'':(packet.channels[0].length/48000).toFixed(2)+' s'}`,input.id);
+    if(exportPacket)candidate.exportPacket=exportPacket;
+    candidate.renderSpec={lab,spec:clone(spec)};this.publish(candidate);this.status='Applied · Result is the next input';
+   }else{
+    this.preview={packet,exportPacket,inputId:input.id,revision,lab,spec:clone(spec)};this.status='Preview ready · Input unchanged';
+   }
+   this.job=null;this.progress=1;this.emit();return true;
+  }catch(e){
+   if(!valid())return false;
+   this.job=null;this.error=e.message;this.status=e.message;this.emit();return false;
+  }
+ }
 }

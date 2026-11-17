@@ -227,7 +227,7 @@ export default {
   "hub.grainSource": "La mezcla mono usa un 50% del canal izquierdo y un 50% del derecho. Izquierdo y Derecho usan un solo canal de origen.",
   "hub.openIR": "Abre un archivo aparte para usarlo como respuesta a impulsos.",
   "hub.rewind": "Vuelve al inicio de la reproducción.",
-  "hub.play": "Usa la barra espaciadora para reproducir o pausar la misma salida que se exporta en WAV.",
+  "hub.play": "Usa la barra espaciadora para reproducir o pausar la preescucha estéreo.",
   "hub.gain": "Ajusta la ganancia para reproducción, WAV y el siguiente Lab. La salida procesada tiene un límite de −1 dBFS.",
   "hub.clip": "Indicador de recorte de salida. Haz clic para restablecerlo.",
   "hub.fadeIn": "Arrastra para ajustar la duración del fundido de entrada.",

@@ -227,7 +227,7 @@ export default {
   "hub.grainSource": "Der Mono-Mix besteht zu 50 % aus links und zu 50 % aus rechts. Links und Rechts verwenden jeweils einen Originalkanal.",
   "hub.openIR": "Öffnet eine separate Datei als Impulsantwort.",
   "hub.rewind": "Setzt die Wiedergabeposition an den Anfang.",
-  "hub.play": "Mit der Leertaste dieselbe Ausgabe abspielen oder anhalten, die als WAV exportiert wird.",
+  "hub.play": "Mit der Leertaste die Stereovorschau abspielen oder anhalten.",
   "hub.gain": "Regelt den Pegel für Wiedergabe, WAV und das nächste Lab. Verarbeitete Ausgabe: höchstens −1 dBFS.",
   "hub.clip": "Zeigt Übersteuerung am Ausgang an. Zum Zurücksetzen klicken.",
   "hub.fadeIn": "Durch Ziehen die Einblenddauer einstellen.",

@@ -1,4 +1,4 @@
-import {tooltipLanguage} from './tooltip-language.js?v=hub-chain-branch1';
+import {tooltipLanguage} from './tooltip-language.js?v=hub-channel-output1';
 
 const delay = 500;
 const gap = 8;
@@ -32,7 +32,7 @@ const hubControlCopy = {
   '#grain-channel': ['hub.grainSource', 'Mono mix uses 50% left and 50% right. Left and Right use one original channel.'],
   '#open-ir': ['hub.openIR', 'Open a separate file to use as an impulse response.'],
   '#rewind': ['hub.rewind', 'Move playback to the start.'],
-  '#play': ['hub.play', 'Press Space to play or pause the same output used for WAV export.'],
+  '#play': ['hub.play', 'Press Space to play or pause the stereo preview.'],
   '#output-gain': ['hub.gain', 'Set gain for playback, WAV and the next Lab. Processed output is capped at −1 dBFS.'],
   '#hub-clip': ['hub.clip', 'Output clip indicator. Click to reset.'],
 };

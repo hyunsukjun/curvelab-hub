@@ -1,18 +1,19 @@
-import {connectHubHelp} from './help-ui.js?v=hub-live-edits1';
-import {createControlHelp} from './control-help.js?v=hub-chain-branch1';
-import {tooltipLanguage} from './tooltip-language.js?v=hub-chain-branch1';
+import {connectHubHelp} from './help-ui.js?v=hub-channel-output1';
+import {createControlHelp} from './control-help.js?v=hub-channel-output1';
+import {tooltipLanguage} from './tooltip-language.js?v=hub-channel-output1';
 import {labTooltipCopy} from './lab-tooltip-copy.js?v=20261108-english-help1';
-import {renderSavedHistory, refreshSavedHistoryTitles} from './history-ui.js?v=hub-chain-branch1';
+import {renderSavedHistory, refreshSavedHistoryTitles} from './history-ui.js?v=hub-channel-output1';
 import {connectOutputMeter} from './output-meter-ui.js?v=20261107-shared-tools2';
 import {granularSourceMode} from './granular-source.js';
 import {NativeTransport} from './native-transport.js';
 import {PCMPlayer} from './player.js?v=hub-live-edits1';
 import {findSourceSeek} from '../labs/audio/src/source-seek.js';
 import {fadeOutput} from '../labs/audio/src/playback-boundary.js';
-import {HubSession} from './session.js?v=hub-live-edits1';
+import {HubSession} from './session.js?v=hub-channel-output1';
+import {configuredOutputChannels} from './channel-output.js?v=hub-channel-output1';
 import {OUTPUT_GAIN_MIN_DB,OUTPUT_GAIN_MAX_DB,measureOutputPeak,outputGainForPeak,outputGainLinear} from './output-gain.js?v=hub-live-edits1';
 import {renderJob} from './renderer.js?v=hub-ir-phases1';
-import {connectSourceEditor} from './source-ui.js?v=hub-chain-branch1';
+import {connectSourceEditor} from './source-ui.js?v=hub-channel-output1';
 import {readAudioFile,validateAudioBuffer} from '../labs/audio/src/audio-import.js';
 import {summarizeChannels,peakOf,paintWaveform} from '../labs/audio/src/waveform-view.js';
 import {analyzeSourceColors} from '../labs/audio/src/source-colors.js';
@@ -224,7 +225,7 @@ async function getFrame(lab){
   const finish=()=>{if(settled)return;try{const bridge=frame.contentWindow?.hubBridge;if(!bridge)return;const defaults=bridge.defaults();if(lab==='audio')rec.neutralSignature=signature({curves:defaults.curves,settings:defaults.extra.settings});frame.contentDocument.body.dataset.hubLab=lab;controlHelp.connectLab(frame,lab,labTooltipCopy[lab]);watchPlayingEdits(lab,rec);rec.defaults=defaults;settled=true;clearInterval(timer);clearTimeout(timeout);resolve(rec);}catch(error){fail(new Error(title(lab)+' editor could not initialize: '+(error.message||String(error))));}};
   const timer=setInterval(finish,80),timeout=setTimeout(()=>fail(new Error(title(lab)+' editor did not load. Retry or select another Lab.')),45000);frame.onload=finish;
  });records.set(lab,rec);$('frames').append(frame);
- const shellVersion=lab==='granular'?'hub-source-waveform1':'20261108-button-tone-b1';
+ const shellVersion=lab==='space'||lab==='granular'?'hub-channel-output1':'20261108-button-tone-b1';
  frame.src=`labs/${lab}/index.html?hub=1&shell=${shellVersion}`;return rec.promise;
 }
 async function syncEditor(){
@@ -306,7 +307,7 @@ function layoutEditors(){
 
 function onCurrent(v){if(v.current?.id!==entryStageId){entryStageId=v.current?.id;entrySignature=null;}auditionCache=null;void stopPlayback();outputPosition=0;lastClock=null;sourceCursor=0;lastId=v.current?.inputId;packet=session.packet();workspace=structuredClone(session.editorWorkspace||{});workspace.byLab??={};if(workspace.active&&workspace.active!==active)entrySignature=null;active=workspace.active||active;workspace.active=active;workspace.grainChannel=granularSourceMode(workspace.grainChannel);$('grain-channel').value=workspace.grainChannel;zoom=1;viewStart=0;colorsData=null;peaks=packet?.channels[0].length?summarizeChannels(packet.channels):[];if(packet?.channels[0].length){const id=lastId;analyzeSourceColors({sampleRate:packet.sampleRate,length:packet.channels[0].length,numberOfChannels:packet.channels.length,getChannelData:i=>packet.channels[i]},data=>{if(lastId===id){colorsData=data;draw();}});}syncEditor();}
 function render(v){if(v.activeJob&&!lastBusy)void stopPlayback();lastBusy=v.activeJob;const restored=v.restoreCount!==lastRestoreCount;if(restored){lastRestoreCount=v.restoreCount;entrySignature=null;outputGainStage=null;}if(restored||v.current?.inputId!==lastId)onCurrent(v);sourceUI.render(v);$('input-name').textContent=packet?.name||v.current?.label||'Loading audio…';$('input-name').title=$('input-name').textContent;$('metadata').textContent=v.current?`${v.current.channels}ch · 48 kHz`:'';$('length').textContent=v.current?fmt(v.current.frames/48000):'';paintStatus(v.status,v.activeJob);$('import-error').hidden=!v.error;$('import-error').textContent=v.error;$('cancel').hidden=!v.activeJob;$('progress').hidden=!v.activeJob;$('progress').value=v.progress;$('frame-block').hidden=!v.activeJob;$('frame-block').textContent=v.status;renderSavedHistory($('history'),v,{names,colors,disabled:assetLoading||v.activeJob,select:id=>selectSavedStage(id).catch(showError),remove:id=>{if(ready&&!sourceUI.busy&&!assetLoading&&!currentBridge()?.busy?.())session.deleteSelectedStage(id)},undoRemove:undoStageDeletion,redoRemove:redoStageDeletion});renderControls();draw();}
-function eligibility(){const v=session.view();if(sourceUI.busy)return 'Applying source volume…';if(assetLoading)return 'Loading separate IR…';if(ready&&records.get(active)?.frame.contentWindow.hubBridge?.busy?.())return 'Preparing analysis or IR…';if(!ready)return editorFailure?.message||'Loading editor…';if(!v.current?.frames)return 'Open audio to begin';if(v.current.frames<4)return 'At least four source frames are required.';if(v.current.channels!==2)return 'Stereo input required; no automatic downmix.';const spec=records.get(active).frame.contentWindow.hubBridge.spec();if((spec.format&&spec.format!=='stereo')||(spec.settings?.format&&spec.settings.format!=='stereo'))return 'This integration currently supports stereo handoff. Choose Stereo 2ch.';if(active==='granular'&&!['mix','0','1'].includes($('grain-channel').value))return 'Choose Mono mix, Left or Right.';if(active==='oscillator'&&spec.settings.soundMode==='resynthesis'&&!spec.settings.analysisResult)return 'Analyzing current input…';return '';}
+function eligibility(){const v=session.view();if(sourceUI.busy)return 'Applying source volume…';if(assetLoading)return 'Loading separate IR…';if(ready&&records.get(active)?.frame.contentWindow.hubBridge?.busy?.())return 'Preparing analysis or IR…';if(!ready)return editorFailure?.message||'Loading editor…';if(!v.current?.frames)return 'Open audio to begin';if(v.current.frames<4)return 'At least four source frames are required.';if(v.current.channels!==2)return 'Stereo input required.';const spec=records.get(active).frame.contentWindow.hubBridge.spec();if(!configuredOutputChannels(active,spec))return 'Choose Stereo 2ch, Quad 4ch or Octo 8ch.';if(active==='granular'&&!['mix','0','1'].includes($('grain-channel').value))return 'Choose Mono mix, Left or Right.';if(active==='oscillator'&&spec.settings.soundMode==='resynthesis'&&!spec.settings.analysisResult)return 'Analyzing current input…';return '';}
 function renderControls(){
  const v=session.view(),preparing=sourceUI.busy||assetLoading||Boolean(ready&&currentBridge()?.busy?.());
  const gainOwner=session.reopened||session.current;
@@ -334,7 +335,7 @@ function renderControls(){
  const continueButton=$('continue-output');
  continueButton.hidden=!v.current||(!session.reopened&&!dirty);
  continueButton.disabled=v.activeJob||switching||!!blocked;
- $('lab-status').textContent=blocked||(session.reopened?`Editing ${v.current.label}`:active==='oscillator'?(mode==='resynthesis'?'File Resynthesis':'Oscillator + File IR'):active==='space'?'Stereo output':'');
+ $('lab-status').textContent=blocked||(session.reopened?`Editing ${v.current.label}`:active==='oscillator'?(mode==='resynthesis'?'File Resynthesis':'Oscillator + File IR'):active==='space'&&wavChannels()===2?'Stereo output':'');
 }
 async function prepareTarget(lab,candidate,valid,signal){
  const rec=await getFrame(lab);if(!valid())return;
@@ -356,8 +357,8 @@ function hasPendingProcessing(){
   ? processingSignature(active,currentSpec(),bridge.snapshot())!==entrySignature
   : dirty);
 }
-function usesSavedOutput(){
- return !!session.reopened&&!dirty;
+function usesSavedOutput(changed=dirty){
+ return !changed&&(!!session.reopened||Boolean(session.current?.exportPacket&&session.working.editState===session.editBase.editState));
 }
 function usesWorkingAudio(){
  const record=records.get('audio');
@@ -367,7 +368,7 @@ function auditionPlan(spec=currentSpec()){
  const processing=processingSignature(active,spec,currentBridge().snapshot());
  const gainDb=outputGain.valueAsNumber;
  const changed=processing!==entrySignature||gainDb!==entryOutputGain()||reopenedInputChanged();
- const saved=session.reopened&&!changed?session.current.packet:null;
+ const saved=usesSavedOutput(changed)?session.current:null;
  const direct=!session.reopened&&active==='audio'&&!changed
   &&processing===records.get('audio').neutralSignature&&gainDb===0?session.working.packet:null;
  return {key:(saved?'saved|':direct?'direct|':'rendered|')+processing,direct,saved,gainDb};
@@ -378,7 +379,7 @@ function matchingOutput(spec){
   ? auditionCache : null;
 }
 async function prepareAudition({live=false}={}){
- if(!ready&&usesSavedOutput())return {packet:session.current.packet,bypass:true};
+ if(!ready&&usesSavedOutput())return {packet:session.current.packet,exportPacket:session.current.exportPacket,bypass:true};
  const blocked=eligibility();
  if(blocked)throw new Error(blocked);
  const working=session.working,lab=active;
@@ -399,9 +400,9 @@ async function prepareAudition({live=false}={}){
    if(saved||direct){
     // Raw input needs its standard edges. A saved stage already has its own.
     const fade=direct&&(!direct.rendered||working.editState!==session.editBase.editState);
-    const packet=fade?{...direct,channels:fadeOutput(direct.channels.map(channel=>channel.slice()),direct.sampleRate)}:saved||direct;
-    const gainReference=saved?session.current.outputGain:null;
-    result={packet,peak:await measureOutputPeak(packet.channels,controller.signal),bypass:true,gainDb,gainReference};
+    const packet=fade?{...direct,channels:fadeOutput(direct.channels.map(channel=>channel.slice()),direct.sampleRate)}:saved?.packet||direct;
+    const gainReference=saved&&session.reopened?saved.outputGain:null;
+    result={packet,exportPacket:saved?.exportPacket,peak:await measureOutputPeak(packet.channels,controller.signal),bypass:true,gainDb,gainReference};
    }else{
     paintStatus(live?'Updating playback…':'Preparing output…',true);
     await currentBridge().prepareOutput?.();
@@ -573,7 +574,7 @@ function updateTransport(){
  seek.value=state.duration?state.seconds/state.duration*1000:0;
  seek.style.setProperty('--range-progress',`${Number(seek.value)/10}%`);
  $('play').classList.toggle('playing',!!state.playing);$('live-state').hidden=!state.playing;
- $('live-state').textContent=liveDirty||liveUpdating||player.replacement?'Updating output…':'WAV output';
+ $('live-state').textContent=liveDirty||liveUpdating||player.replacement?'Updating output…':player.output?.exportPacket?'Stereo Preview':'WAV output';
  const pending=!!transport.pending,busy=!!session.job||assetLoading||!ready;
  $('play').textContent=pending?'…':state.playing?'Ⅱ':'▶';
  $('play').setAttribute('aria-label',transport.pausing?(transport.pending.resume?'Cancel resume':'Resume after pause'):pending?'Cancel playback request':state.playing?'Pause':'Play');
@@ -614,7 +615,8 @@ $('export').onclick=async()=>{
   if(session.current!==stage||session.working!==working||active!==lab)return;
   if(ready&&output.key!==auditionPlan().key)return;
   const gain=outputGain.valueAsNumber;
-  const {packet:p}=output.bypass?output:await session.finishOutput(output,gain,undefined,{preserve:true});
+  const {packet:p}=output.bypass?{packet:output.exportPacket||output.packet}
+   :await session.finishOutput(output,gain,undefined,{preserve:true,wavOnly:true});
   if(session.current!==stage||session.working!==working||active!==lab||gain!==outputGain.valueAsNumber
    ||ready&&output.key!==auditionPlan().key)return;
   let clipped=0;
@@ -623,10 +625,10 @@ $('export').onclick=async()=>{
   const blob=encodeWav(p.channels,p.sampleRate,{bitDepth:24,dither:false});
   const url=URL.createObjectURL(blob),a=document.createElement('a');
   a.href=url;
-  a.download=p===stage.packet?'CurveLab-Hub-'+stage.id+'.wav':'CurveLab-Hub-'+lab+'-output.wav';
+  a.download=p===stage.packet||p===stage.exportPacket?'CurveLab-Hub-'+stage.id+'.wav':'CurveLab-Hub-'+lab+'-output.wav';
   a.click();
   setTimeout(()=>URL.revokeObjectURL(url),30000);
-  session.status='WAV exported · 48 kHz / 24-bit';session.emit();
+  session.status=`WAV exported · ${p.channels.length}ch · 48 kHz / 24-bit`;session.emit();
  }catch(e){if(e.name!=='AbortError')showError(e);}
  finally{exporting=false;$('export').removeAttribute('aria-busy');renderControls();}
 };
@@ -666,8 +668,16 @@ if(['localhost','127.0.0.1','[::1]'].includes(location.hostname)&&new URLSearchP
 
 function applySharedTool(tool){if(ready){currentBridge()?.setEditingTool(tool||'pen');saveWorkspace();const rec=records.get(active);if(rec)rec.signature=signature(currentBridge().snapshot());}}
 for(const [id,tool]of [['source-pen','pen'],['source-eraser','eraser']])$(id).onclick=()=>sourceUI.setTool(sourceUI.tool===tool?null:tool);
+function wavChannels(){
+ if(usesSavedOutput())return session.current?.exportPacket?.channels.length??2;
+ if(ready&&(active==='space'||active==='granular'))return configuredOutputChannels(active,currentBridge().spec())??2;
+ return 2;
+}
 function refreshExportTitle() {
- $('export').title=tooltipLanguage.text('hub.export','Download the same output that Play uses, as a 24-bit WAV.');
+ const channels=wavChannels(),button=$('export');
+ button.textContent=channels>2?`Download WAV · ${channels}ch`:'Download WAV';
+ button.title=channels>2?`24-bit WAV · ${channels}ch`
+  :tooltipLanguage.text('hub.export','Download the same output that Play uses, as a 24-bit WAV.');
 }
 tooltipLanguage.subscribe(() => {
  const view = session.view();

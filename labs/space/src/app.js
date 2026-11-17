@@ -1573,7 +1573,7 @@ window.hubBridge={
 let hubTimer;function hubChanged(){if(hubQuiet)return;clearTimeout(hubTimer);hubTimer=setTimeout(()=>parent.postMessage({hub:'changed',lab:'space'},location.origin),40);}
 for(const event of ['change','pointerup','keyup'])document.addEventListener(event,hubChanged);
 document.addEventListener('click',e=>{if(e.target.closest('button'))hubChanged();});
-window.addEventListener('keydown',e=>{if(e.code==='Space'&&!e.target.matches('input,textarea')){e.preventDefault();e.stopImmediatePropagation();if(!e.repeat)parent.postMessage({hub:'play'},location.origin);}},true);
+window.addEventListener('keydown',e=>{if(e.code==='Space'&&!e.target.matches('input,textarea,select')){e.preventDefault();e.stopImmediatePropagation();if(!e.repeat)parent.postMessage({hub:'play'},location.origin);}},true);
 parent.postMessage({hub:'ready',lab:'space'},location.origin);
 
 engineReadout.closest('.readout').hidden=true;
@@ -1595,17 +1595,6 @@ window.hubBridge.seekSource=seconds=>window.hubBridge.transport.seek(seconds/Mat
 // Display-only pause; native playback and AudioContext state remain untouched.
 import {gateSelfScheduledDisplay} from "../../../src/visual-activity.js";
 updateMeterDisplay=gateSelfScheduledDisplay(updateMeterDisplay,meterRows[0]);
-
-// Local Hub output contract; headphone preview remains the existing stereo path.
-renderFormat.replaceChildren(new Option('Stereo 2ch','stereo'));
-renderFormat.value='stereo';renderFormat.hidden=true;renderFormat.style.setProperty('display','none','important');
-const hubStereoRestore=window.hubBridge.restore;
-window.hubBridge.restore=s=>{
- if(s){s=structuredClone(s);if(s.dom?.renderFormat)s.dom.renderFormat.value='stereo';}
- renderFormat.value='stereo';hubStereoRestore(s);
-};
-const hubStereoDefaults=window.hubBridge.defaults;
-window.hubBridge.defaults=()=>{const s=hubStereoDefaults();if(s.dom?.renderFormat)s.dom.renderFormat.value='stereo';return s;};
 
 // Hub output display reads the existing analyser, without changing the signal path.
 import {createMeterTap} from '../../../src/hub-meter-tap.js?v=20261108-relative-gain1';

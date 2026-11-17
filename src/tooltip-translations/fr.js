@@ -227,7 +227,7 @@ export default {
   "hub.grainSource": "Le mixage mono utilise 50 % du canal gauche et 50 % du droit. Gauche et Droite utilisent chacun un seul canal d’origine.",
   "hub.openIR": "Ouvrez un fichier distinct à utiliser comme réponse impulsionnelle.",
   "hub.rewind": "Revenez au début de la lecture.",
-  "hub.play": "La barre d’espace lance ou met en pause le même son que celui exporté en WAV.",
+  "hub.play": "La barre d’espace lance ou met en pause l’aperçu stéréo.",
   "hub.gain": "Règle le gain pour la lecture, le WAV et le Lab suivant. La sortie traitée est limitée à −1 dBFS.",
   "hub.clip": "Indicateur d’écrêtage de sortie. Cliquez pour réinitialiser.",
   "hub.fadeIn": "Faites glisser pour régler la durée du fondu d’entrée.",
