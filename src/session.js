@@ -5,6 +5,7 @@ import {configuredOutputChannels,stereoOutput} from './channel-output.js?v=hub-c
 const clone=x=>structuredClone(x),copy=p=>({...p,referenceBlob:undefined,channels:p.channels.map(c=>c.slice())});
 const MAX_EDIT_UNDO=30;
 const HISTORY_AUDIO_BYTES=256*1024*1024;
+class HubAudioLimitError extends Error {}
 export class HubSession{
  constructor(renderer,change=()=>{}){this.renderer=renderer;this.change=change;this.nodes=[];this.deletedStages=[];this.stageDeletionRedo=[];this.undoEdits=[];this.redoEdits=[];this.current=null;this.working=null;this.reopened=null;this.preview=null;this.job=null;this.serial=0;this.revision=0;this.restoreCount=0;this.status='Loading Bach Prelude…';this.error='';this.progress=0;}
  view(){
@@ -32,7 +33,7 @@ export class HubSession{
     source?.editState?.pieces.forEach(p=>p.channels.forEach(c=>buffers.add(c.buffer)));
    }
   }
-  if(stages.length>30||[...buffers].reduce((a,b)=>a+b.byteLength,0)>HISTORY_AUDIO_BYTES)throw new Error('Session history limit reached. Export before starting a new session.');
+  if(stages.length>30||[...buffers].reduce((a,b)=>a+b.byteLength,0)>HISTORY_AUDIO_BYTES)throw new HubAudioLimitError('Session history limit reached. Export before starting a new session.');
  }
  make(packet,label,parentId,workspace={}){const p=copy(packet);return {id:'stage-'+(++this.serial),label,parentId,packet:p,workspace:clone(workspace),selection:null,kind:'input',editState:p.channels.length===2&&p.channels[0].length?initialEdit(...p.channels,p.sampleRate):null};}
  publish(n){
@@ -62,7 +63,7 @@ export class HubSession{
   this.undoEdits=[];this.redoEdits=[];
  }
  async load(producer){this.invalidate();const token=++this.serial;this.job={token};this.status='Loading…';this.error='';this.emit();try{const p=await producer();await this.validate(p,true);if(this.job?.token!==token)return false;const n=this.make(p,p.name||'Source',null);this.publish(n);this.job=null;this.status='Input ready';this.emit();return true;}catch(e){if(this.job?.token!==token)return false;this.job=null;this.error=e.message;this.status=e.message;this.emit();return false;}}
- restore(id){const n=this.nodes.find(n=>n.id===id);if(!n)return false;this.invalidate();this.resetWorking(n,true);this.restoreCount++;this.status='Restored · Audio and settings';this.emit();return true;}
+ restore(id){const n=this.nodes.find(n=>n.id===id);if(!n)return false;this.invalidate();this.resetWorking(n,true);this.restoreCount++;this.error='';this.status='Restored · Audio and settings';this.emit();return true;}
  deleteSelectedStage(id){
   if(this.current?.id!==id)return false;
   return this.deleteStage(id,false);
@@ -169,7 +170,7 @@ export class HubSession{
     ? Math.ceil(Math.min(600,Math.max(1,Number(spec.settings.durationSeconds??20)))*input.sampleRate)
     : input.channels[0].length;
    if(frames*(channelCount+2)*Float32Array.BYTES_PER_ELEMENT>HISTORY_AUDIO_BYTES){
-    throw new Error('Multichannel output exceeds the Hub audio limit. Shorten the audio or choose fewer output channels.');
+    throw new HubAudioLimitError('Multichannel output exceeds the Hub audio limit. Shorten the audio or choose fewer output channels.');
    }
   }
   const job=this.renderer(lab,copy(input),clone(spec),progress=>onProgress(progress*.85));
@@ -188,7 +189,7 @@ export class HubSession{
   }finally{signal.removeEventListener('abort',cancel);}
  }
  // Prepare the target while the current work remains authoritative. A null spec passes the working audio through.
- async handoff(lab,spec,workspace,target,prepareTarget,{outputGainDb=0,restoreId=null,prepared=null,continueOutput=false}={}){
+ async handoff(lab,spec,workspace,target,prepareTarget,{outputGainDb=0,restoreId=null,prepared=null,continueOutput=false,confirmDiscard=null}={}){
   const restoreStage=restoreId===null?null:this.nodes.find(node=>node.id===restoreId);
   if(this.job||!this.current||!this.working.packet.channels[0].length)return false;
   if(restoreId!==null&&(!restoreStage||!spec))return false;
@@ -245,7 +246,12 @@ export class HubSession{
     this.status+=` · Output Gain ${gain>0?'+':''}${gain.toFixed(1)} dB${outputGain.limited?' (limited)':''} · Peak ${peak} dBFS`;
    }
    this.emit();return true;
-  }catch(e){if(!valid())return false;this.job=null;this.error=e.message;this.status=e.message;this.emit();return false;}
+  }catch(e){
+   if(!valid())return false;
+   this.job=null;this.error=e.message;this.status=e.message;
+   if(restoreStage&&e instanceof HubAudioLimitError&&confirmDiscard?.())return this.restore(restoreStage.id);
+   this.emit();return false;
+  }
  }
  async run(lab,spec,workspace,apply){
   if(this.job||!this.current||!this.working.packet.channels[0].length)return false;

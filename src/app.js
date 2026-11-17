@@ -9,7 +9,7 @@ import {NativeTransport} from './native-transport.js';
 import {PCMPlayer} from './player.js?v=hub-live-edits1';
 import {findSourceSeek} from '../labs/audio/src/source-seek.js';
 import {fadeOutput} from '../labs/audio/src/playback-boundary.js';
-import {HubSession} from './session.js?v=hub-channel-output1';
+import {HubSession} from './session.js?v=hub-history-limit-recovery1';
 import {configuredOutputChannels} from './channel-output.js?v=hub-channel-output1';
 import {OUTPUT_GAIN_MIN_DB,OUTPUT_GAIN_MAX_DB,measureOutputPeak,outputGainForPeak,outputGainLinear} from './output-gain.js?v=hub-live-edits1';
 import {renderJob} from './renderer.js?v=hub-ir-phases1';
@@ -466,7 +466,10 @@ async function selectSavedStage(id){
  const current=session.current;
  if(id===current?.id&&(!current.recipe||session.reopened)&&!hasPendingProcessing())return false;
  return leaveLab((from,spec,outputGainDb)=>{
-  if(spec)return session.handoff(from,spec,workspace,'audio',null,{outputGainDb,restoreId:id,prepared:matchingOutput(spec)});
+  if(spec)return session.handoff(from,spec,workspace,'audio',null,{
+   outputGainDb,restoreId:id,prepared:matchingOutput(spec),
+   confirmDiscard:()=>window.confirm('This draft exceeds the Hub audio limit. Discard it and open the selected stage?')
+  });
   return session.restore(id);
  });
 }
