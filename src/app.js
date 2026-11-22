@@ -9,7 +9,7 @@ import {NativeTransport} from './native-transport.js';
 import {PCMPlayer} from './player.js?v=hub-live-edits1';
 import {findSourceSeek} from '../labs/audio/src/source-seek.js';
 import {fadeOutput} from '../labs/audio/src/playback-boundary.js';
-import {HubSession} from './session.js?v=curvelab-name1';
+import {HubSession} from './session.js?v=curvelab-resolved-warnings1';
 import {configuredOutputChannels} from './channel-output.js?v=hub-channel-output1';
 import {OUTPUT_GAIN_MIN_DB,OUTPUT_GAIN_MAX_DB,measureOutputPeak,outputGainForPeak,outputGainLinear} from './output-gain.js?v=hub-live-edits1';
 import {renderJob} from './renderer.js?v=hub-ir-phases1';
@@ -43,6 +43,7 @@ outputGain.oninput=()=>{
 };
 let active='audio',lastId=null,packet=null,peaks=[],colorsData=null,zoom=1,viewStart=0,waveHeight=180,frameHeight=430,ready=false,syncSerial=0,workspace={byLab:{},active:'audio',grainChannel:'mix'},dirty=false,assetLoading=false,editorFailure=null,sourceCursor=0,lastBusy=false,controlBlocked=true;
 let editorLoadController=null,entrySignature=null,entryStageId=null,lastRestoreCount=0,switching=false,irAssetSerial=0,exporting=false;
+let irFailure=null;
 const records=new Map();const session=new HubSession(renderJob,render);
 const currentBridge=()=>ready?records.get(active)?.frame.contentWindow.hubBridge:null;
 const transport=new NativeTransport({bridge:()=>auditionBridge,blocked:()=>session.job?'Processing…':eligibility(),changed:()=>{renderControls();updateTransport();},error:error=>{if(error.name!=='AbortError')showError(error);}});
@@ -176,7 +177,7 @@ const overviewPaint=createSourceOverview($('overview-canvas'));
 
 const signature=s=>JSON.stringify(s,(key,value)=>ArrayBuffer.isView(value)?{type:value.constructor.name,length:value.length}:value instanceof ArrayBuffer?{bytes:value.byteLength}:value);
 const title=s=>s[0].toUpperCase()+s.slice(1),fmt=n=>{const min=Math.floor(n/60),sec=(n%60).toFixed(2).padStart(5,'0');return String(min).padStart(2,'0')+':'+sec};
-function showError(e){session.status=e.message||String(e);session.error=session.status;session.emit();}
+function showError(e){irFailure=null;session.status=e.message||String(e);session.error=session.status;session.noteOutputLimitError(e);session.emit();}
 function saveWorkspace(){if(ready&&records.get(active)?.frame.contentWindow.hubBridge){workspace.byLab[active]=records.get(active).frame.contentWindow.hubBridge.snapshot();workspace.active=active;workspace.grainChannel=$('grain-channel').value;}session.rememberWorkspace(workspace);}
 function processingSignature(lab,spec,snapshot){
  if(lab==='timbre'){
@@ -306,7 +307,12 @@ function layoutEditors(){
 }
 
 function onCurrent(v){if(v.current?.id!==entryStageId){entryStageId=v.current?.id;entrySignature=null;}auditionCache=null;void stopPlayback();outputPosition=0;lastClock=null;sourceCursor=0;lastId=v.current?.inputId;packet=session.packet();workspace=structuredClone(session.editorWorkspace||{});workspace.byLab??={};if(workspace.active&&workspace.active!==active)entrySignature=null;active=workspace.active||active;workspace.active=active;workspace.grainChannel=granularSourceMode(workspace.grainChannel);$('grain-channel').value=workspace.grainChannel;zoom=1;viewStart=0;colorsData=null;peaks=packet?.channels[0].length?summarizeChannels(packet.channels):[];if(packet?.channels[0].length){const id=lastId;analyzeSourceColors({sampleRate:packet.sampleRate,length:packet.channels[0].length,numberOfChannels:packet.channels.length,getChannelData:i=>packet.channels[i]},data=>{if(lastId===id){colorsData=data;draw();}});}syncEditor();}
-function render(v){if(v.activeJob&&!lastBusy)void stopPlayback();lastBusy=v.activeJob;const restored=v.restoreCount!==lastRestoreCount;if(restored){lastRestoreCount=v.restoreCount;entrySignature=null;outputGainStage=null;}if(restored||v.current?.inputId!==lastId)onCurrent(v);sourceUI.render(v);$('input-name').textContent=packet?.name||v.current?.label||'Loading audio…';$('input-name').title=$('input-name').textContent;$('metadata').textContent=v.current?`${v.current.channels}ch · 48 kHz`:'';$('length').textContent=v.current?fmt(v.current.frames/48000):'';paintStatus(v.status,v.activeJob);$('import-error').hidden=!v.error;$('import-error').textContent=v.error;$('cancel').hidden=!v.activeJob;$('progress').hidden=!v.activeJob;$('progress').value=v.progress;$('frame-block').hidden=!v.activeJob;$('frame-block').textContent=v.status;renderSavedHistory($('history'),v,{names,colors,disabled:assetLoading||v.activeJob,select:id=>selectSavedStage(id).catch(showError),remove:id=>{if(ready&&!sourceUI.busy&&!assetLoading&&!currentBridge()?.busy?.())session.deleteSelectedStage(id)},undoRemove:undoStageDeletion,redoRemove:redoStageDeletion});renderControls();draw();}
+function render(v){
+ if(ready&&!v.activeJob&&session.hasLimitError){
+  const spec=currentSpec();
+  if(session.clearResolvedLimitError(active,spec,matchingOutput(spec)))v={...v,error:session.error,status:session.status};
+ }
+ if(v.activeJob&&!lastBusy)void stopPlayback();lastBusy=v.activeJob;const restored=v.restoreCount!==lastRestoreCount;if(restored){lastRestoreCount=v.restoreCount;entrySignature=null;outputGainStage=null;}if(restored||v.current?.inputId!==lastId)onCurrent(v);sourceUI.render(v);$('input-name').textContent=packet?.name||v.current?.label||'Loading audio…';$('input-name').title=$('input-name').textContent;$('metadata').textContent=v.current?`${v.current.channels}ch · 48 kHz`:'';$('length').textContent=v.current?fmt(v.current.frames/48000):'';paintStatus(v.status,v.activeJob);$('import-error').hidden=!v.error;$('import-error').textContent=v.error;$('cancel').hidden=!v.activeJob;$('progress').hidden=!v.activeJob;$('progress').value=v.progress;$('frame-block').hidden=!v.activeJob;$('frame-block').textContent=v.status;renderSavedHistory($('history'),v,{names,colors,disabled:assetLoading||v.activeJob,select:id=>selectSavedStage(id).catch(showError),remove:id=>{if(ready&&!sourceUI.busy&&!assetLoading&&!currentBridge()?.busy?.())session.deleteSelectedStage(id)},undoRemove:undoStageDeletion,redoRemove:redoStageDeletion});renderControls();draw();}
 function eligibility(){const v=session.view();if(sourceUI.busy)return 'Applying source volume…';if(assetLoading)return 'Loading separate IR…';if(ready&&records.get(active)?.frame.contentWindow.hubBridge?.busy?.())return 'Preparing analysis or IR…';if(!ready)return editorFailure?.message||'Loading editor…';if(!v.current?.frames)return 'Open audio to begin';if(v.current.frames<4)return 'At least four source frames are required.';if(v.current.channels!==2)return 'Stereo input required.';const spec=records.get(active).frame.contentWindow.hubBridge.spec();if(!configuredOutputChannels(active,spec))return 'Choose Stereo 2ch, Quad 4ch or Octo 8ch.';if(active==='granular'&&!['mix','0','1'].includes($('grain-channel').value))return 'Choose Mono mix, Left or Right.';if(active==='oscillator'&&spec.settings.soundMode==='resynthesis'&&!spec.settings.analysisResult)return 'Analyzing current input…';return '';}
 function renderControls(){
  const v=session.view(),preparing=sourceUI.busy||assetLoading||Boolean(ready&&currentBridge()?.busy?.());
@@ -415,6 +421,8 @@ async function prepareAudition({live=false}={}){
    controller.signal.throwIfAborted();
    if(!sameInput()||(!request.live&&key!==auditionPlan().key))throw new DOMException('Output changed','AbortError');
    auditionCache={working,lab,key,...result};
+   if(session.hasLimitError&&key===auditionPlan().key
+    &&session.clearResolvedLimitError(lab,currentSpec(),auditionCache))session.emit();
    return auditionCache;
   }finally{
    if(auditionRequest===request){
@@ -523,6 +531,8 @@ function syncLabSettings(rec){
  const spec=currentSpec(),duration=controlledDuration(active,spec);
  const durationChanged=duration!==rec.outputDuration;
  rec.outputDuration=duration;
+ if(durationChanged&&Number.isFinite(duration)&&duration>0
+  &&session.error==='Choose an Output Duration above 0 sec.')session.error='';
  const processing=processingSignature(active,spec,snap);
  const changed=processing!==rec.processingSignature;
  rec.processingSignature=processing;
@@ -565,7 +575,26 @@ $('grain-channel').onchange=()=>{
  });
  rec.task.catch(showError);
 };
-$('open-ir').onclick=()=>$('ir-file').click();$('ir-file').onchange=async()=>{const file=$('ir-file').files[0];if(!file)return;assetLoading=true;stopPlayback();session.touch();renderControls();try{await records.get('oscillator').frame.contentWindow.hubBridge.loadIR(file);workspace.irAssetId=++irAssetSerial;const record=records.get(active);record.processingSignature=processingSignature(active,currentSpec(),currentBridge().snapshot());refreshDraft();saveWorkspace();session.status='Separate IR ready · Resynthesis source unchanged';}catch(e){showError(e)}finally{assetLoading=false;$('ir-file').value='';session.emit();fitEditor();}};
+$('open-ir').onclick=()=>$('ir-file').click();
+$('ir-file').onchange=async()=>{
+ const file=$('ir-file').files[0];if(!file)return;
+ assetLoading=true;stopPlayback();session.touch();renderControls();
+ try{
+  await records.get('oscillator').frame.contentWindow.hubBridge.loadIR(file);
+  workspace.irAssetId=++irAssetSerial;
+  const record=records.get(active);
+  record.processingSignature=processingSignature(active,currentSpec(),currentBridge().snapshot());
+  refreshDraft();saveWorkspace();
+  if(irFailure?.serial===session.serial&&irFailure.message===session.error)session.error='';
+  irFailure=null;
+  session.status='Separate IR ready · Resynthesis source unchanged';
+ }catch(e){
+  showError(e);
+  irFailure={message:session.error,serial:session.serial};
+ }finally{
+  assetLoading=false;$('ir-file').value='';session.emit();fitEditor();
+ }
+};
 async function stopPlayback(){await transport.stop();paintStatus(session.status,!!session.job);}
 function togglePlay(){if(!session.job&&!$('hub-info').open)void transport.toggle();}
 $('play').onclick=togglePlay;$('rewind').onclick=()=>void transport.seek(0);$('seek').oninput=()=>void transport.seek(Number($('seek').value)/1000);

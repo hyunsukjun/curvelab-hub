@@ -5,9 +5,23 @@ import {configuredOutputChannels,stereoOutput} from './channel-output.js?v=hub-c
 const clone=x=>structuredClone(x),copy=p=>({...p,referenceBlob:undefined,channels:p.channels.map(c=>c.slice())});
 const MAX_EDIT_UNDO=30;
 const HISTORY_AUDIO_BYTES=256*1024*1024;
-class HubAudioLimitError extends Error {}
+const HISTORY_LIMIT_MESSAGE='Session history limit reached. Export before starting a new session.';
+const OUTPUT_LIMIT_MESSAGE='Multichannel output exceeds the CurveLab audio limit. Shorten the audio or choose fewer output channels.';
+class HubAudioLimitError extends Error {
+ constructor(message,scope=null){super(message);this.scope=scope;}
+}
+function outputFrameCount(lab,input,spec){
+ if(lab==='space')return input.channels[0].length;
+ if(lab!=='granular'&&lab!=='oscillator')return null;
+ const duration=Number(spec.settings.durationSeconds??20);
+ if(!Number.isFinite(duration)||duration<=0)return null;
+ const frames=Math.ceil(Math.min(600,Math.max(1,duration))*input.sampleRate);
+ const impulse=lab==='oscillator'&&spec.settings.convolutionEnabled&&spec.settings.convolutionWet>0
+  ? spec.impulse?.channels?.[0] : null;
+ return frames+(impulse?impulse.length-1:0);
+}
 export class HubSession{
- constructor(renderer,change=()=>{}){this.renderer=renderer;this.change=change;this.nodes=[];this.deletedStages=[];this.stageDeletionRedo=[];this.undoEdits=[];this.redoEdits=[];this.current=null;this.working=null;this.reopened=null;this.preview=null;this.job=null;this.serial=0;this.revision=0;this.restoreCount=0;this.status='Loading Bach Prelude…';this.error='';this.progress=0;}
+ constructor(renderer,change=()=>{}){this.renderer=renderer;this.change=change;this.nodes=[];this.deletedStages=[];this.stageDeletionRedo=[];this.undoEdits=[];this.redoEdits=[];this.current=null;this.working=null;this.reopened=null;this.preview=null;this.job=null;this.serial=0;this.revision=0;this.restoreCount=0;this.status='Loading Bach Prelude…';this.error='';this.limitFailure=null;this.progress=0;}
  view(){
   const n=this.current,w=this.working;
   return {current:n?{id:n.id,inputId:w.id,label:n.label,kind:n.kind,parentId:n.parentId,frames:w.packet.channels[0].length,sampleRate:w.packet.sampleRate,channels:w.packet.channels.length}:null,
@@ -22,8 +36,14 @@ export class HubSession{
  cancel(){if(!this.job)return;this.job.cancel?.();this.job=null;this.serial++;this.status='Cancelled · Current input retained';this.emit();}
  invalidate(){this.cancel();this.preview=null;this.revision++;}
  touch(){this.invalidate();this.status='Settings changed · Preview needs refresh';this.emit();}
+ get hasLimitError(){return this.limitFailure?.message===this.error&&this.limitFailure?.working===this.working;}
+ noteOutputLimitError(error,fromOutputHandoff=false){
+  const outputFailure=error instanceof HubAudioLimitError
+   &&(error.scope==='output'||fromOutputHandoff&&error.message===HISTORY_LIMIT_MESSAGE);
+  this.limitFailure=outputFailure&&this.error===error.message?{message:error.message,working:this.working}:null;
+ }
  async validate(p,input=false,{checkSamples=true}={}){if(!p||!p.channels?.length||p.channels.length>8||p.sampleRate!==48000)throw new Error('CurveLab requires 48 kHz audio, 1–8 channels.');const n=p.channels[0].length;if(p.channels.some(c=>!(c instanceof Float32Array)||c.length!==n))throw new Error('Invalid channel data');if(n/48000>(input?180:660))throw new Error('Duration exceeds this CurveLab review build limit.');if(checkSamples)for(const c of p.channels)for(let i=0;i<n;i++)if(!Number.isFinite(c[i]))throw new Error('Invalid audio sample; previous input retained');}
- capacity(node,deleted=[],edits=[]){
+ capacity(node,deleted=[],edits=[],reservedAudioBytes=0){
   const stages=[...this.nodes,...deleted.map(record=>record.stage)];if(node)stages.push(node);
   const buffers=new Set();
   for(const n of [...stages,...edits]){
@@ -33,7 +53,25 @@ export class HubSession{
     source?.editState?.pieces.forEach(p=>p.channels.forEach(c=>buffers.add(c.buffer)));
    }
   }
-  if(stages.length>30||[...buffers].reduce((a,b)=>a+b.byteLength,0)>HISTORY_AUDIO_BYTES)throw new HubAudioLimitError('Session history limit reached. Export before starting a new session.');
+  if(stages.length>30||[...buffers].reduce((a,b)=>a+b.byteLength,reservedAudioBytes)>HISTORY_AUDIO_BYTES)throw new HubAudioLimitError(HISTORY_LIMIT_MESSAGE);
+ }
+ clearResolvedLimitError(lab,spec,prepared=null){
+  const historyLimit=this.error===HISTORY_LIMIT_MESSAGE;
+  if(!this.hasLimitError||this.job||!this.working)return false;
+  const channelCount=configuredOutputChannels(lab,spec);
+  if(!channelCount)return false;
+  const frames=prepared?.packet?.channels?.[0]?.length??outputFrameCount(lab,this.working.packet,spec);
+  if(!Number.isFinite(frames)||frames<=0)return false;
+  const audioBytes=frames*(channelCount>2?channelCount+2:2)*Float32Array.BYTES_PER_ELEMENT;
+  if(channelCount>2&&audioBytes>HISTORY_AUDIO_BYTES)return false;
+  if(historyLimit){
+   try{this.capacity({recipe:this.working},[],[],audioBytes);}
+   catch(error){if(error instanceof HubAudioLimitError)return false;throw error;}
+  }
+  if(this.status===this.error)this.status='Settings updated';
+  this.error='';
+  this.limitFailure=null;
+  return true;
  }
  make(packet,label,parentId,workspace={}){const p=copy(packet);return {id:'stage-'+(++this.serial),label,parentId,packet:p,workspace:clone(workspace),selection:null,kind:'input',editState:p.channels.length===2&&p.channels[0].length?initialEdit(...p.channels,p.sampleRate):null};}
  publish(n){
@@ -62,8 +100,8 @@ export class HubSession{
   this.working={id:this.baseInputId,packet,editState,selection:null};
   this.undoEdits=[];this.redoEdits=[];
  }
- async load(producer){this.invalidate();const token=++this.serial;this.job={token};this.status='Loading…';this.error='';this.emit();try{const p=await producer();await this.validate(p,true);if(this.job?.token!==token)return false;const n=this.make(p,p.name||'Source',null);this.publish(n);this.job=null;this.status='Input ready';this.emit();return true;}catch(e){if(this.job?.token!==token)return false;this.job=null;this.error=e.message;this.status=e.message;this.emit();return false;}}
- restore(id){const n=this.nodes.find(n=>n.id===id);if(!n)return false;this.invalidate();this.resetWorking(n,true);this.restoreCount++;this.error='';this.status='Restored · Audio and settings';this.emit();return true;}
+ async load(producer){this.invalidate();const token=++this.serial;this.job={token};this.status='Loading…';this.error='';this.limitFailure=null;this.emit();try{const p=await producer();await this.validate(p,true);if(this.job?.token!==token)return false;const n=this.make(p,p.name||'Source',null);this.publish(n);this.job=null;this.status='Input ready';this.emit();return true;}catch(e){if(this.job?.token!==token)return false;this.job=null;this.error=e.message;this.status=e.message;this.emit();return false;}}
+ restore(id){const n=this.nodes.find(n=>n.id===id);if(!n)return false;this.invalidate();this.resetWorking(n,true);this.restoreCount++;this.error='';this.limitFailure=null;this.status='Restored · Audio and settings';this.emit();return true;}
  deleteSelectedStage(id){
   if(this.current?.id!==id)return false;
   return this.deleteStage(id,false);
@@ -135,7 +173,7 @@ export class HubSession{
  async applyEditState(next,undo,redo){
   this.invalidate();
   const controller=new AbortController(),token=++this.serial,base=this.editBase;
-  this.job={token,cancel:()=>controller.abort()};this.status='Applying source edit…';this.error='';this.emit();
+  this.job={token,cancel:()=>controller.abort()};this.status='Applying source edit…';this.error='';this.limitFailure=null;this.emit();
   try{
    const saved=next.editState===base.editState,length=lengthOf(next.editState);
    const packet=saved?base.packet:{...base.packet,channels:[new Float32Array(length),new Float32Array(length)]};
@@ -166,11 +204,9 @@ export class HubSession{
   const channelCount=configuredOutputChannels(lab,spec);
   if(!channelCount)throw new Error('Choose Stereo 2ch, Quad 4ch or Octo 8ch.');
   if(channelCount>2){
-   const frames=lab==='granular'
-    ? Math.ceil(Math.min(600,Math.max(1,Number(spec.settings.durationSeconds??20)))*input.sampleRate)
-    : input.channels[0].length;
+   const frames=outputFrameCount(lab,input,spec);
    if(frames*(channelCount+2)*Float32Array.BYTES_PER_ELEMENT>HISTORY_AUDIO_BYTES){
-    throw new HubAudioLimitError('Multichannel output exceeds the CurveLab audio limit. Shorten the audio or choose fewer output channels.');
+    throw new HubAudioLimitError(OUTPUT_LIMIT_MESSAGE,'output');
    }
   }
   const job=this.renderer(lab,copy(input),clone(spec),progress=>onProgress(progress*.85));
@@ -196,7 +232,7 @@ export class HubSession{
   this.rememberWorkspace(workspace);
   const input=this.current,working=this.working,reopened=this.reopened,recipeWorkspace=this.editorWorkspace,inputLabel=this.inputLabel;
   const revision=this.revision,token=++this.serial;
-  const controller=new AbortController();this.job={token,cancel:()=>controller.abort()};this.progress=0;this.error='';this.status=restoreStage?'Saving '+lab+'…':spec?'Processing '+lab+' → '+target+'…':'Preparing '+target+'…';this.emit();
+  const controller=new AbortController();this.job={token,cancel:()=>controller.abort()};this.progress=0;this.error='';this.limitFailure=null;this.status=restoreStage?'Saving '+lab+'…':spec?'Processing '+lab+' → '+target+'…':'Preparing '+target+'…';this.emit();
   const valid=()=>this.job?.token===token&&this.current===input&&this.working===working&&this.revision===revision;
   try{
    const nextWorkspace={active:target,byLab:{},grainChannel:workspace.grainChannel||'mix'};
@@ -249,6 +285,7 @@ export class HubSession{
   }catch(e){
    if(!valid())return false;
    this.job=null;this.error=e.message;this.status=e.message;
+   this.noteOutputLimitError(e,true);
    if(restoreStage&&e instanceof HubAudioLimitError&&confirmDiscard?.())return this.restore(restoreStage.id);
    this.emit();return false;
   }
@@ -258,7 +295,7 @@ export class HubSession{
   this.rememberWorkspace(workspace);
   const input=this.current,revision=this.revision,token=++this.serial,controller=new AbortController();
   this.job={token,cancel:()=>controller.abort()};
-  this.progress=0;this.error='';this.status=apply?'Applying…':'Preparing preview…';this.emit();
+  this.progress=0;this.error='';this.limitFailure=null;this.status=apply?'Applying…':'Preparing preview…';this.emit();
   const valid=()=>this.job?.token===token&&this.current===input&&this.revision===revision;
   try{
    const {packet,exportPacket}=await this.prepareOutputBase(lab,this.working.packet,spec,controller.signal,progress=>{
@@ -275,7 +312,7 @@ export class HubSession{
    this.job=null;this.progress=1;this.emit();return true;
   }catch(e){
    if(!valid())return false;
-   this.job=null;this.error=e.message;this.status=e.message;this.emit();return false;
+   this.job=null;this.error=e.message;this.status=e.message;this.noteOutputLimitError(e,true);this.emit();return false;
   }
  }
 }
