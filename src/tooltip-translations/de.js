@@ -226,6 +226,7 @@ export default {
   "hub.original": "Stellt das ursprüngliche Audio wieder her.",
   "hub.grainSource": "Der Mono-Mix besteht zu 50 % aus links und zu 50 % aus rechts. Links und Rechts verwenden jeweils einen Originalkanal.",
   "hub.openIR": "Öffnet eine separate Datei als Impulsantwort.",
+  "hub.processFromHere": "Startet einen neuen Bearbeitungsdurchgang im selben Lab mit dem aktuellen Ergebnis als neuer Eingabe. Ungespeicherte Änderungen werden zuerst gespeichert; vorherige Stufen bleiben erhalten.",
   "hub.rewind": "Setzt die Wiedergabeposition an den Anfang.",
   "hub.play": "Mit der Leertaste die Stereovorschau abspielen oder anhalten.",
   "hub.gain": "Regelt den Pegel für Wiedergabe, WAV und das nächste Lab. Verarbeitete Ausgabe: höchstens −1 dBFS.",

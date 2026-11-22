@@ -226,6 +226,7 @@ export default {
   "hub.original": "Recupera el audio de origen.",
   "hub.grainSource": "La mezcla mono usa un 50% del canal izquierdo y un 50% del derecho. Izquierdo y Derecho usan un solo canal de origen.",
   "hub.openIR": "Abre un archivo aparte para usarlo como respuesta a impulsos.",
+  "hub.processFromHere": "Inicia una nueva pasada en el mismo Lab usando el resultado actual como nueva entrada. Los cambios pendientes se guardan primero; las etapas anteriores se conservan.",
   "hub.rewind": "Vuelve al inicio de la reproducción.",
   "hub.play": "Usa la barra espaciadora para reproducir o pausar la preescucha estéreo.",
   "hub.gain": "Ajusta la ganancia para reproducción, WAV y el siguiente Lab. La salida procesada tiene un límite de −1 dBFS.",

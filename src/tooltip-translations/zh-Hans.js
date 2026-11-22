@@ -226,6 +226,7 @@ export default {
   "hub.original": "恢复原始音频。",
   "hub.grainSource": "单声道混合由 50% 左声道与 50% 右声道组成。选择左或右时，只使用对应的原始声道。",
   "hub.openIR": "打开另一个文件用作脉冲响应。",
+  "hub.processFromHere": "以当前结果作为新输入，在同一个 Lab 中开始新一轮处理。未保存的修改会先保存，之前的阶段会保留。",
   "hub.rewind": "将播放位置移到开头。",
   "hub.play": "按空格键播放或暂停立体声预览。",
   "hub.gain": "调节播放、WAV 和下一 Lab 的增益。处理后输出的峰值上限为 −1 dBFS。",

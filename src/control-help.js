@@ -1,4 +1,4 @@
-import {tooltipLanguage} from './tooltip-language.js?v=hub-channel-output1';
+import {tooltipLanguage} from './tooltip-language.js?v=curvelab-process-from-here1';
 
 const delay = 500;
 const gap = 8;
@@ -31,6 +31,7 @@ const hubControlCopy = {
   '#restore-original': ['hub.original', 'Restore the original audio.'],
   '#grain-channel': ['hub.grainSource', 'Mono mix uses 50% left and 50% right. Left and Right use one original channel.'],
   '#open-ir': ['hub.openIR', 'Open a separate file to use as an impulse response.'],
+  '#continue-output': ['hub.processFromHere', 'Start a new pass in this Lab using the current result as the new input. Unsaved changes are saved first; previous stages are kept.'],
   '#rewind': ['hub.rewind', 'Move playback to the start.'],
   '#play': ['hub.play', 'Press Space to play or pause the stereo preview.'],
   '#output-gain': ['hub.gain', 'Set gain for playback, WAV and the next Lab. Processed output is capped at −1 dBFS.'],

@@ -13,7 +13,7 @@ export const tooltipLanguage = {
 
     let next = {};
     try {
-      if (code !== 'en') next = (await import(`./tooltip-translations/${code}.js?v=hub-channel-output1`)).default;
+      if (code !== 'en') next = (await import(`./tooltip-translations/${code}.js?v=curvelab-process-from-here1`)).default;
     } catch {
       code = 'en';
     }

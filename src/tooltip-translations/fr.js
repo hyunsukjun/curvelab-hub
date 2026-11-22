@@ -226,6 +226,7 @@ export default {
   "hub.original": "Rétablissez le signal audio d’origine.",
   "hub.grainSource": "Le mixage mono utilise 50 % du canal gauche et 50 % du droit. Gauche et Droite utilisent chacun un seul canal d’origine.",
   "hub.openIR": "Ouvrez un fichier distinct à utiliser comme réponse impulsionnelle.",
+  "hub.processFromHere": "Démarre un nouveau passage dans le même Lab en utilisant le résultat actuel comme nouvelle entrée. Les modifications en attente sont d’abord enregistrées ; les étapes précédentes sont conservées.",
   "hub.rewind": "Revenez au début de la lecture.",
   "hub.play": "La barre d’espace lance ou met en pause l’aperçu stéréo.",
   "hub.gain": "Règle le gain pour la lecture, le WAV et le Lab suivant. La sortie traitée est limitée à −1 dBFS.",
