@@ -1,7 +1,7 @@
 // Localized copy for the Hub help dialog. English is the HTML source of truth.
 export const helpTranslations = {
   "zh-Hans": {
-    title: "CurveLab Hub · 帮助",
+    title: "CurveLab · 帮助",
     language: "帮助语言",
     close: "关闭帮助",
     headings: [
@@ -43,7 +43,7 @@ export const helpTranslations = {
   },
 
   "fr": {
-    title: "CurveLab Hub · Aide",
+    title: "CurveLab · Aide",
     language: "Langue",
     close: "Fermer l’aide",
     headings: [
@@ -85,7 +85,7 @@ export const helpTranslations = {
   },
 
   "de": {
-    title: "CurveLab Hub · Hilfe",
+    title: "CurveLab · Hilfe",
     language: "Sprache",
     close: "Hilfe schließen",
     headings: [
@@ -127,7 +127,7 @@ export const helpTranslations = {
   },
 
   "it": {
-    title: "CurveLab Hub · Guida",
+    title: "CurveLab · Guida",
     language: "Lingua",
     close: "Chiudi la guida",
     headings: [
@@ -169,7 +169,7 @@ export const helpTranslations = {
   },
 
   "ja": {
-    title: "CurveLab Hub · ヘルプ",
+    title: "CurveLab · ヘルプ",
     language: "ヘルプの言語",
     close: "ヘルプを閉じる",
     headings: [
@@ -211,7 +211,7 @@ export const helpTranslations = {
   },
 
   "ko": {
-    title: "CurveLab Hub · 도움말",
+    title: "CurveLab · 도움말",
     language: "도움말 언어",
     close: "도움말 닫기",
     headings: [
@@ -253,7 +253,7 @@ export const helpTranslations = {
   },
 
   "pt": {
-    title: "CurveLab Hub · Ajuda",
+    title: "CurveLab · Ajuda",
     language: "Idioma",
     close: "Fechar a ajuda",
     headings: [
@@ -295,7 +295,7 @@ export const helpTranslations = {
   },
 
   "es": {
-    title: "CurveLab Hub · Ayuda",
+    title: "CurveLab · Ayuda",
     language: "Idioma",
     close: "Cerrar la ayuda",
     headings: [

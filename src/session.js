@@ -22,7 +22,7 @@ export class HubSession{
  cancel(){if(!this.job)return;this.job.cancel?.();this.job=null;this.serial++;this.status='Cancelled · Current input retained';this.emit();}
  invalidate(){this.cancel();this.preview=null;this.revision++;}
  touch(){this.invalidate();this.status='Settings changed · Preview needs refresh';this.emit();}
- async validate(p,input=false,{checkSamples=true}={}){if(!p||!p.channels?.length||p.channels.length>8||p.sampleRate!==48000)throw new Error('Hub requires 48 kHz audio, 1–8 channels.');const n=p.channels[0].length;if(p.channels.some(c=>!(c instanceof Float32Array)||c.length!==n))throw new Error('Invalid channel data');if(n/48000>(input?180:660))throw new Error('Duration exceeds this Hub review build limit.');if(checkSamples)for(const c of p.channels)for(let i=0;i<n;i++)if(!Number.isFinite(c[i]))throw new Error('Invalid audio sample; previous input retained');}
+ async validate(p,input=false,{checkSamples=true}={}){if(!p||!p.channels?.length||p.channels.length>8||p.sampleRate!==48000)throw new Error('CurveLab requires 48 kHz audio, 1–8 channels.');const n=p.channels[0].length;if(p.channels.some(c=>!(c instanceof Float32Array)||c.length!==n))throw new Error('Invalid channel data');if(n/48000>(input?180:660))throw new Error('Duration exceeds this CurveLab review build limit.');if(checkSamples)for(const c of p.channels)for(let i=0;i<n;i++)if(!Number.isFinite(c[i]))throw new Error('Invalid audio sample; previous input retained');}
  capacity(node,deleted=[],edits=[]){
   const stages=[...this.nodes,...deleted.map(record=>record.stage)];if(node)stages.push(node);
   const buffers=new Set();
@@ -170,7 +170,7 @@ export class HubSession{
     ? Math.ceil(Math.min(600,Math.max(1,Number(spec.settings.durationSeconds??20)))*input.sampleRate)
     : input.channels[0].length;
    if(frames*(channelCount+2)*Float32Array.BYTES_PER_ELEMENT>HISTORY_AUDIO_BYTES){
-    throw new HubAudioLimitError('Multichannel output exceeds the Hub audio limit. Shorten the audio or choose fewer output channels.');
+    throw new HubAudioLimitError('Multichannel output exceeds the CurveLab audio limit. Shorten the audio or choose fewer output channels.');
    }
   }
   const job=this.renderer(lab,copy(input),clone(spec),progress=>onProgress(progress*.85));

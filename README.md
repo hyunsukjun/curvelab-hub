@@ -1,8 +1,10 @@
-# CurveLab Hub
+# CurveLab
 
 [Open the public prototype](https://hyunsukjun.github.io/curvelab-hub/). This prototype is updated through the repository’s main branch.
 
-CurveLab Hub brings Audio, Timbre, Space, Granular, Spectral, and Oscillator into one browser workspace. Load an audio file, edit its source waveform, and move between labs. Switching labs carries the working audio forward and adds a Sound Chain stage only when the processing settings have changed.
+CurveLab brings Audio, Timbre, Space, Granular, Spectral, and Oscillator into one browser workspace. Load an audio file, edit its source waveform, and move between labs. Switching labs carries the working audio forward and adds a Sound Chain stage only when the processing settings have changed.
+
+The web edition currently uses the name CurveLab. When the Mac standalone edition launches, the planned web edition name is CurveLab for Web.
 
 Serve this directory over HTTP from localhost or over HTTPS. Open its index page in a browser.
 

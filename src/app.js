@@ -1,4 +1,4 @@
-import {connectHubHelp} from './help-ui.js?v=hub-channel-output1';
+import {connectHubHelp} from './help-ui.js?v=curvelab-name1';
 import {createControlHelp} from './control-help.js?v=hub-channel-output1';
 import {tooltipLanguage} from './tooltip-language.js?v=hub-channel-output1';
 import {labTooltipCopy} from './lab-tooltip-copy.js?v=20261108-english-help1';
@@ -9,7 +9,7 @@ import {NativeTransport} from './native-transport.js';
 import {PCMPlayer} from './player.js?v=hub-live-edits1';
 import {findSourceSeek} from '../labs/audio/src/source-seek.js';
 import {fadeOutput} from '../labs/audio/src/playback-boundary.js';
-import {HubSession} from './session.js?v=hub-history-limit-recovery1';
+import {HubSession} from './session.js?v=curvelab-name1';
 import {configuredOutputChannels} from './channel-output.js?v=hub-channel-output1';
 import {OUTPUT_GAIN_MIN_DB,OUTPUT_GAIN_MAX_DB,measureOutputPeak,outputGainForPeak,outputGainLinear} from './output-gain.js?v=hub-live-edits1';
 import {renderJob} from './renderer.js?v=hub-ir-phases1';
@@ -468,7 +468,7 @@ async function selectSavedStage(id){
  return leaveLab((from,spec,outputGainDb)=>{
   if(spec)return session.handoff(from,spec,workspace,'audio',null,{
    outputGainDb,restoreId:id,prepared:matchingOutput(spec),
-   confirmDiscard:()=>window.confirm('This draft exceeds the Hub audio limit. Discard it and open the selected stage?')
+   confirmDiscard:()=>window.confirm('This draft exceeds the CurveLab audio limit. Discard it and open the selected stage?')
   });
   return session.restore(id);
  });
@@ -628,7 +628,7 @@ $('export').onclick=async()=>{
   const blob=encodeWav(p.channels,p.sampleRate,{bitDepth:24,dither:false});
   const url=URL.createObjectURL(blob),a=document.createElement('a');
   a.href=url;
-  a.download=p===stage.packet||p===stage.exportPacket?'CurveLab-Hub-'+stage.id+'.wav':'CurveLab-Hub-'+lab+'-output.wav';
+  a.download=p===stage.packet||p===stage.exportPacket?'CurveLab-'+stage.id+'.wav':'CurveLab-'+lab+'-output.wav';
   a.click();
   setTimeout(()=>URL.revokeObjectURL(url),30000);
   session.status=`WAV exported · ${p.channels.length}ch · 48 kHz / 24-bit`;session.emit();
