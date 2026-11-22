@@ -3,6 +3,7 @@ import {VOLUME_MAX_GAIN,VOLUME_MAX_POINTS} from '../labs/audio/src/source-volume
 import {initialEdit,lengthOf,deleteRange,setFade,materialize} from '../labs/audio/src/output-edit-core.js';
 import {configuredOutputChannels,stereoOutput} from './channel-output.js?v=hub-channel-output1';
 import {reverseSource} from './source-reverse.js?v=curvelab-source-reverse1';
+import {fadeOutput} from '../labs/audio/src/playback-boundary.js';
 const clone=x=>structuredClone(x),copy=p=>({...p,referenceBlob:undefined,channels:p.channels.map(c=>c.slice())});
 const MAX_EDIT_UNDO=30;
 const HISTORY_AUDIO_BYTES=256*1024*1024;
@@ -200,6 +201,11 @@ export class HubSession{
   const base=await this.prepareOutputBase(lab,input,spec,signal,onProgress);
   return this.finishOutput(base,outputGainDb,signal);
  }
+ async prepareDirectOutput(input,fade,signal){
+  signal.throwIfAborted();
+  const packet=fade?{...input,channels:fadeOutput(input.channels.map(channel=>channel.slice()),input.sampleRate)}:input;
+  return {packet,peak:await measureOutputPeak(packet.channels,signal)};
+ }
  async finishOutput({packet,exportPacket,peak},outputGainDb,signal,{preserve=false,wavOnly=false}={}){
   const {gain,outputGain}=outputGainForPeak(peak,outputGainDb);
   if(wavOnly)packet=exportPacket||packet;
@@ -237,7 +243,7 @@ export class HubSession{
   }finally{signal.removeEventListener('abort',cancel);}
  }
  // Prepare the target while the current work remains authoritative. A null spec passes the working audio through.
- async handoff(lab,spec,workspace,target,prepareTarget,{outputGainDb=0,restoreId=null,prepared=null,continueOutput=false,confirmDiscard=null}={}){
+ async handoff(lab,spec,workspace,target,prepareTarget,{outputGainDb=0,restoreId=null,prepared=null,directSource=false,continueOutput=false,confirmDiscard=null}={}){
   const restoreStage=restoreId===null?null:this.nodes.find(node=>node.id===restoreId);
   if(this.job||!this.current||!this.working.packet.channels[0].length)return false;
   if(restoreId!==null&&(!restoreStage||!spec))return false;
@@ -260,14 +266,23 @@ export class HubSession{
     this.job=null;this.progress=1;this.status=target[0].toUpperCase()+target.slice(1)+' ready · Working audio retained';
     this.emit();return true;
    }
-   const {packet:result,exportPacket,outputGain}=prepared
+   let output;
+   if(directSource){
+    if(lab!=='audio'||reopened||outputGainDb!==0)throw new Error('Invalid source-only handoff');
+    this.capacity({recipe:working},[],[],working.packet.channels[0].length*2*Float32Array.BYTES_PER_ELEMENT);
+    const direct=await this.prepareDirectOutput(working.packet,!working.packet.rendered||working.editState!==this.editBase.editState,controller.signal);
+    const peakDb=direct.peak>0?20*Math.log10(direct.peak):null;
+    // Preserve the neutral Audio preview exactly, including its existing boundary fade.
+    output={packet:{...direct.packet,rendered:true},outputGain:{requestedGainDb:0,inputPeakDb:peakDb,gainDb:0,outputPeakDb:peakDb,limited:false,skipped:false}};
+   }else output=prepared
     ? await this.finishOutput(prepared,outputGainDb,controller.signal,{preserve:true})
     : await this.prepareOutput(lab,working.packet,spec,outputGainDb,controller.signal,(progress,status)=>{
-    if(!valid())return;
-    this.progress=progress;
-    if(status)this.status=status;
-    this.emit();
-   });
+     if(!valid())return;
+     this.progress=progress;
+     if(status)this.status=status;
+     this.emit();
+    });
+   const {packet:result,exportPacket,outputGain}=output;
    if(!valid())return false;
    const parentId=reopened?input.parentId:input.id;
    const formatLabel=exportPacket?` · ${exportPacket.channels.length}ch`:'';
