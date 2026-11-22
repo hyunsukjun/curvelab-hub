@@ -1,6 +1,7 @@
 export default {
   "source.source-pen": "Bearbeiten Sie Lautstärkepunkte in der Quellwellenform und Kurvenpunkte im Lab. Erneut klicken, um zur Audioauswahl zurückzukehren.",
   "source.source-eraser": "Entfernen Sie einen Lautstärke- oder Kurvenpunkt. Audiobereiche bleiben erhalten.",
+  "source.source-reverse": "Kehrt das gesamte Arbeitsaudio zeitlich um, einschließlich der aktuellen Lautstärke und Fades. Auswahl und Zoom begrenzen den Bereich nicht. Rückgängig stellt das Audio wieder her.",
   "source.zoom-out": "Zeigt einen größeren Ausschnitt der Quellwellenform.",
   "source.zoom-in": "Zeigt einen kleineren Ausschnitt der Quellwellenform detaillierter.",
   "source.zoom-fit": "Zeigt die gesamte Quellwellenform.",

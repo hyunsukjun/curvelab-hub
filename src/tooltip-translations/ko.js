@@ -1,6 +1,7 @@
 export default {
   "source.source-pen": "소스 파형의 음량 점과 Lab의 커브 점을 편집합니다. 다시 누르면 구간 선택으로 돌아갑니다.",
   "source.source-eraser": "음량 점이나 커브 점을 지웁니다. 음원 구간은 유지됩니다.",
+  "source.source-reverse": "현재 음량과 페이드를 반영한 작업 음원 전체를 거꾸로 만듭니다. 선택 구간과 확대 상태는 처리 범위를 제한하지 않습니다. Undo로 복원할 수 있습니다.",
   "source.zoom-out": "소스 파형을 더 넓게 봅니다.",
   "source.zoom-in": "소스 파형의 더 좁은 구간을 자세히 봅니다.",
   "source.zoom-fit": "소스 파형 전체를 화면에 맞춰 표시합니다.",

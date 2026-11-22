@@ -1,6 +1,7 @@
 export default {
   "source.source-pen": "编辑源音频波形的音量控制点和 Lab 的曲线控制点。再次单击返回音频选区模式。",
   "source.source-eraser": "删除音量或曲线控制点。音频片段保持不变。",
+  "source.source-reverse": "倒放整个工作音频，包括当前的音量和淡入淡出效果。选区和缩放不限制处理范围。撤销可还原。",
   "source.zoom-out": "显示更大范围的源音频波形。",
   "source.zoom-in": "放大源音频波形的一小段，以便查看细节。",
   "source.zoom-fit": "将完整的源音频波形显示在窗口内。",

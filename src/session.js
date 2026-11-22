@@ -2,6 +2,7 @@ import {measureOutputPeak,outputGainForPeak,scaleOutput} from './output-gain.js?
 import {VOLUME_MAX_GAIN,VOLUME_MAX_POINTS} from '../labs/audio/src/source-volume.js?v=20261028-volume-line1';
 import {initialEdit,lengthOf,deleteRange,setFade,materialize} from '../labs/audio/src/output-edit-core.js';
 import {configuredOutputChannels,stereoOutput} from './channel-output.js?v=hub-channel-output1';
+import {reverseSource} from './source-reverse.js?v=curvelab-source-reverse1';
 const clone=x=>structuredClone(x),copy=p=>({...p,referenceBlob:undefined,channels:p.channels.map(c=>c.slice())});
 const MAX_EDIT_UNDO=30;
 const HISTORY_AUDIO_BYTES=256*1024*1024;
@@ -154,7 +155,11 @@ export class HubSession{
  async edit(action,value){
   const n=this.working;if(this.job||!n?.editState)return false;
   let next;
-  if(action==='delete'){
+  if(action==='reverse'){
+   if(n.packet.channels[0].length<2)return false;
+   const undo=[...this.undoEdits,this.editSnapshot()].slice(-MAX_EDIT_UNDO);
+   return this.applyEditState({reverseFrom:n.packet,selection:null},undo,[]);
+  }else if(action==='delete'){
    if(!n.selection)return false;
    next=deleteRange(n.editState,...n.selection);
   }else if(['fadeIn','fadeOut'].includes(action)&&Number.isFinite(value)){
@@ -175,11 +180,18 @@ export class HubSession{
   const controller=new AbortController(),token=++this.serial,base=this.editBase;
   this.job={token,cancel:()=>controller.abort()};this.status='Applying source edit…';this.error='';this.limitFailure=null;this.emit();
   try{
-   const saved=next.editState===base.editState,length=lengthOf(next.editState);
+   const reversing=next.reverseFrom,saved=!reversing&&next.editState===base.editState;
+   const length=reversing?reversing.channels[0].length:lengthOf(next.editState);
+   if(reversing)this.capacity(null,this.deletedStages,[...undo,...redo],length*2*Float32Array.BYTES_PER_ELEMENT);
    const packet=saved?base.packet:{...base.packet,channels:[new Float32Array(length),new Float32Array(length)]};
-   const working={...next,id:saved?this.baseInputId:'edit-'+token,packet};
+   const editState=reversing?initialEdit(...packet.channels,packet.sampleRate):next.editState;
+   const working={editState,selection:next.selection,id:saved?this.baseInputId:'edit-'+token,packet};
    this.capacity(null,this.deletedStages,[working,...undo,...redo]);
-   if(!saved){await materialize(next.editState,packet.channels,controller.signal);await this.validate(packet);}
+   if(!saved){
+    if(reversing)await reverseSource(reversing.channels,packet.channels,controller.signal);
+    else await materialize(editState,packet.channels,controller.signal);
+    await this.validate(packet);
+   }
    if(this.job?.token!==token)return false;
    this.working=working;this.undoEdits=undo;this.redoEdits=redo;this.job=null;this.status='Source edit applied';this.emit();return true;
   }catch(e){if(this.job?.token!==token)return false;this.job=null;this.status=e.message;this.error=e.message;this.emit();return false;}

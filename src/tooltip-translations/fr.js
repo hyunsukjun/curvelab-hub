@@ -1,6 +1,7 @@
 export default {
   "source.source-pen": "Modifiez les points de volume sur la forme d’onde source et les points de courbe dans le Lab. Cliquez de nouveau pour revenir à la sélection audio.",
   "source.source-eraser": "Supprimez un point de volume ou de courbe. Les régions audio sont conservées.",
+  "source.source-reverse": "Inverse le sens de lecture de tout l’audio de travail, y compris le volume et les fondus actuels. La sélection et le zoom ne limitent pas la zone traitée. Annuler rétablit l’audio.",
   "source.zoom-out": "Affichez une portion plus large de la forme d’onde source.",
   "source.zoom-in": "Affichez une portion plus petite de la forme d’onde source avec davantage de détails.",
   "source.zoom-fit": "Affichez toute la forme d’onde source.",

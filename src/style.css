@@ -31,7 +31,7 @@ main>.status-line{flex:0 0 auto;max-height:6em;overflow:auto;min-width:0}
 
 /* One symmetric rail for source, Lab content and playback. */
 :root{--hub-surface:#30353c;--hub-rail-safe:6px;--hub-control-fill:#393e46;--hub-control-edge:#505660}
-:is(#export,#undo-edit,#redo-edit,#delete,#grain-channel,#retry-editor,#open-ir,#cancel,#volume-reset,#continue-output),
+:is(#export,#undo-edit,#redo-edit,#delete,#grain-channel,#retry-editor,#open-ir,#cancel,#volume-reset,#source-reverse,#continue-output),
 #workspace-content>header .file,.transport>button:not(.playing),#labs button[aria-pressed="false"]{
  background-color:var(--hub-control-fill);border-color:var(--hub-control-edge);
 }

@@ -1,7 +1,7 @@
 // Hub input adapter. Volume, deletion and fade calculations use the pinned Audio core.
 import {volumePoints,volumeNorm,volumeDb,volumeLabel,volumeGainAt,putVolumePoint,eraseVolumePoint,hasSourceVolume} from '../labs/audio/src/source-volume.js?v=20261028-volume-line1';
 import {volumePointer,volumeHit} from '../labs/audio/src/source-volume-view.js?v=20261028-volume-line1';
-import {tooltipLanguage} from './tooltip-language.js?v=curvelab-process-from-here1';
+import {tooltipLanguage} from './tooltip-language.js?v=curvelab-source-reverse1';
 export function connectSourceEditor(session,repaint,getView=()=>({start:0,end:session.view().current?.frames||0}),seek=()=>{},beforeVolume=()=>{},busyChanged=()=>{},getCursor=()=>getView().start,toolChanged=()=>{}){
  const $=id=>document.getElementById(id),wave=$('wave');let gesture=null,view=null,held=false,latched=false,volumeTool='pen',selected=0,pending=false,lastNode=null;
  const seconds=n=>Number(n.toFixed(6)).toString(),editing=()=>held||latched||gesture?.kind==='volume',activeTool=()=>held?'pen':volumeTool;
@@ -17,6 +17,19 @@ export function connectSourceEditor(session,repaint,getView=()=>({start:0,end:se
   try{await pause;if(session.working?.id===id&&!session.job)await session.edit('volume',next.volume);}
   catch(e){session.error=e.message;session.status='Volume not applied: '+e.message;session.emit();}
   finally{pending=false;refresh();busyChanged();}
+ }
+ async function applyReverse(){
+  if(!editable()||gesture)return;
+  const working=session.working,button=$('source-reverse'),hadFocus=document.activeElement===button;
+  pending=true;refresh();busyChanged();
+  try{
+   await beforeVolume();
+   if(session.working===working&&!session.job)await session.edit('reverse');
+  }catch(e){session.error=e.message;session.status='Reverse not applied: '+e.message;session.emit();}
+  finally{
+   pending=false;refresh();busyChanged();
+   if(hadFocus&&(document.activeElement===button||document.activeElement===document.body))wave.focus({preventScroll:true});
+  }
  }
  function finish(cancel=false,e){
   if(!gesture)return;if(e&&!cancel)move(e);const g=gesture;gesture=null;
@@ -86,12 +99,14 @@ export function connectSourceEditor(session,repaint,getView=()=>({start:0,end:se
   const changed=await session.edit(side,e.key==='Home'?0:v.edit[side]+delta);if(changed&&document.activeElement===document.body&&target.isConnected&&!target.disabled)target.focus({preventScroll:true});
  });
  $('delete').onclick=()=>!editing()&&session.edit('delete');$('undo-edit').onclick=()=>session.undoEdit();$('redo-edit').onclick=()=>session.redoEdit();
+ $('source-reverse').onclick=()=>void applyReverse();
  $('volume-reset').onclick=()=>{if(editable()&&!gesture)void applyVolume({...model(session.view()),volume:[]},session.working.id,Promise.resolve().then(beforeVolume));};
  function render(v){
   view=v;if(gesture&&(gesture.node!==v.current?.inputId||v.activeJob))finish(true);
   if(lastNode!==v.current?.inputId){lastNode=v.current?.inputId;selected=Math.min(selected,Math.max(0,volumePoints(model(v),v.current?.frames||0).length-1));}
   const active=!!v.edit&&!v.activeJob&&!pending,n=v.current?.frames||0,volume=editing();
   $('delete').disabled=!active||volume||!v.edit.selection;$('undo-edit').disabled=!active||!v.edit.canUndo;$('redo-edit').disabled=!active||!v.edit.canRedo;
+  $('source-reverse').disabled=!active||n<2||!!gesture;
   for(const [id,tool]of [['source-pen','pen'],['source-eraser','eraser']]){$(id).disabled=!active||!n;$(id).setAttribute('aria-pressed',String(volume&&activeTool()===tool));}$('volume-reset').hidden=!v.edit?.volume?.length;$('volume-reset').disabled=!active||!v.edit?.volume?.length;
   wave.setAttribute('aria-disabled',String(!active||!n));wave.dataset.volumeEditing=String(!!volume);wave.dataset.volumeTool=activeTool();
   wave.setAttribute('aria-label',volume?(activeTool()==='eraser'?'Source volume eraser. Click an interior point to delete. Audio regions and endpoints stay protected. Escape exits.':'Source volume envelope, mute to +6 dB. Click to add; drag to move. Option-click deletes interior points. Arrow keys adjust. Home resets a point to 0 dB. Escape cancels.'):'Source waveform. Click to seek; drag to select. Command shows volume editing.');

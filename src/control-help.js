@@ -1,4 +1,4 @@
-import {tooltipLanguage} from './tooltip-language.js?v=curvelab-process-from-here1';
+import {tooltipLanguage} from './tooltip-language.js?v=curvelab-source-reverse1';
 
 const delay = 500;
 const gap = 8;
@@ -7,6 +7,7 @@ const edge = 12;
 const sourceTooltipCopy = {
   '#source-pen': 'Edit volume points in the source waveform and curve points in the Lab. Click again to return to source selection.',
   '#source-eraser': 'Remove a volume or curve point. Audio regions stay intact.',
+  '#source-reverse': 'Reverse the entire working audio, including current volume and fades. Selection and zoom do not limit the range. Undo restores it.',
   '#zoom-out': 'Show more of the source waveform.',
   '#zoom-in': 'Show a smaller portion of the source waveform in more detail.',
   '#zoom-fit': 'Show the full source waveform.',

@@ -1,19 +1,19 @@
-import {connectHubHelp} from './help-ui.js?v=curvelab-process-from-here1';
-import {createControlHelp} from './control-help.js?v=curvelab-process-from-here1';
-import {tooltipLanguage} from './tooltip-language.js?v=curvelab-process-from-here1';
+import {connectHubHelp} from './help-ui.js?v=curvelab-source-reverse1';
+import {createControlHelp} from './control-help.js?v=curvelab-source-reverse1';
+import {tooltipLanguage} from './tooltip-language.js?v=curvelab-source-reverse1';
 import {labTooltipCopy} from './lab-tooltip-copy.js?v=20261108-english-help1';
-import {renderSavedHistory, refreshSavedHistoryTitles} from './history-ui.js?v=curvelab-process-from-here1';
+import {renderSavedHistory, refreshSavedHistoryTitles} from './history-ui.js?v=curvelab-source-reverse1';
 import {connectOutputMeter} from './output-meter-ui.js?v=20261107-shared-tools2';
 import {granularSourceMode} from './granular-source.js';
 import {NativeTransport} from './native-transport.js';
 import {PCMPlayer} from './player.js?v=hub-live-edits1';
 import {findSourceSeek} from '../labs/audio/src/source-seek.js';
 import {fadeOutput} from '../labs/audio/src/playback-boundary.js';
-import {HubSession} from './session.js?v=curvelab-resolved-warnings1';
+import {HubSession} from './session.js?v=curvelab-source-reverse1';
 import {configuredOutputChannels} from './channel-output.js?v=hub-channel-output1';
 import {OUTPUT_GAIN_MIN_DB,OUTPUT_GAIN_MAX_DB,measureOutputPeak,outputGainForPeak,outputGainLinear} from './output-gain.js?v=hub-live-edits1';
 import {renderJob} from './renderer.js?v=hub-ir-phases1';
-import {connectSourceEditor} from './source-ui.js?v=curvelab-process-from-here1';
+import {connectSourceEditor} from './source-ui.js?v=curvelab-source-reverse1';
 import {readAudioFile,validateAudioBuffer} from '../labs/audio/src/audio-import.js';
 import {summarizeChannels,peakOf,paintWaveform} from '../labs/audio/src/waveform-view.js';
 import {analyzeSourceColors} from '../labs/audio/src/source-colors.js';
@@ -313,7 +313,7 @@ function render(v){
   if(session.clearResolvedLimitError(active,spec,matchingOutput(spec)))v={...v,error:session.error,status:session.status};
  }
  if(v.activeJob&&!lastBusy)void stopPlayback();lastBusy=v.activeJob;const restored=v.restoreCount!==lastRestoreCount;if(restored){lastRestoreCount=v.restoreCount;entrySignature=null;outputGainStage=null;}if(restored||v.current?.inputId!==lastId)onCurrent(v);sourceUI.render(v);$('input-name').textContent=packet?.name||v.current?.label||'Loading audio…';$('input-name').title=$('input-name').textContent;$('metadata').textContent=v.current?`${v.current.channels}ch · 48 kHz`:'';$('length').textContent=v.current?fmt(v.current.frames/48000):'';paintStatus(v.status,v.activeJob);$('import-error').hidden=!v.error;$('import-error').textContent=v.error;$('cancel').hidden=!v.activeJob;$('progress').hidden=!v.activeJob;$('progress').value=v.progress;$('frame-block').hidden=!v.activeJob;$('frame-block').textContent=v.status;renderSavedHistory($('history'),v,{names,colors,disabled:assetLoading||v.activeJob,select:id=>selectSavedStage(id).catch(showError),remove:id=>{if(ready&&!sourceUI.busy&&!assetLoading&&!currentBridge()?.busy?.())session.deleteSelectedStage(id)},undoRemove:undoStageDeletion,redoRemove:redoStageDeletion});renderControls();draw();}
-function eligibility(){const v=session.view();if(sourceUI.busy)return 'Applying source volume…';if(assetLoading)return 'Loading separate IR…';if(ready&&records.get(active)?.frame.contentWindow.hubBridge?.busy?.())return 'Preparing analysis or IR…';if(!ready)return editorFailure?.message||'Loading editor…';if(!v.current?.frames)return 'Open audio to begin';if(v.current.frames<4)return 'At least four source frames are required.';if(v.current.channels!==2)return 'Stereo input required.';const spec=records.get(active).frame.contentWindow.hubBridge.spec();if(!configuredOutputChannels(active,spec))return 'Choose Stereo 2ch, Quad 4ch or Octo 8ch.';if(active==='granular'&&!['mix','0','1'].includes($('grain-channel').value))return 'Choose Mono mix, Left or Right.';if(active==='oscillator'&&spec.settings.soundMode==='resynthesis'&&!spec.settings.analysisResult)return 'Analyzing current input…';return '';}
+function eligibility(){const v=session.view();if(sourceUI.busy)return 'Applying source edit…';if(assetLoading)return 'Loading separate IR…';if(ready&&records.get(active)?.frame.contentWindow.hubBridge?.busy?.())return 'Preparing analysis or IR…';if(!ready)return editorFailure?.message||'Loading editor…';if(!v.current?.frames)return 'Open audio to begin';if(v.current.frames<4)return 'At least four source frames are required.';if(v.current.channels!==2)return 'Stereo input required.';const spec=records.get(active).frame.contentWindow.hubBridge.spec();if(!configuredOutputChannels(active,spec))return 'Choose Stereo 2ch, Quad 4ch or Octo 8ch.';if(active==='granular'&&!['mix','0','1'].includes($('grain-channel').value))return 'Choose Mono mix, Left or Right.';if(active==='oscillator'&&spec.settings.soundMode==='resynthesis'&&!spec.settings.analysisResult)return 'Analyzing current input…';return '';}
 function renderControls(){
  const v=session.view(),preparing=sourceUI.busy||assetLoading||Boolean(ready&&currentBridge()?.busy?.());
  const gainOwner=session.reopened||session.current;
@@ -628,7 +628,7 @@ function updateTransport(){
 }
 connectOutputMeter($('output-meter'),()=>ready&&!session.job?auditionBridge:null);
 setInterval(updateTransport,100);
-window.addEventListener('keydown',e=>{if($('hub-info').open||e.target.closest?.('#hub-info-button,#continue-output'))return;if(e.code==='Space'&&!e.target.matches('input,select,textarea,summary')&&!e.target.isContentEditable){e.preventDefault();if(!e.repeat)togglePlay();}});
+window.addEventListener('keydown',e=>{if($('hub-info').open||e.target.closest?.('#hub-info-button,#continue-output,#source-reverse'))return;if(e.code==='Space'&&!e.target.matches('input,select,textarea,summary')&&!e.target.isContentEditable){e.preventDefault();if(!e.repeat)togglePlay();}});
 async function decode(file){const bytes=await readAudioFile(file,48000),ctx=new OfflineAudioContext(2,1,48000),b=await ctx.decodeAudioData(bytes);await validateAudioBuffer(b);if(![1,2].includes(b.numberOfChannels))throw new Error('Multichannel file: open a mono or stereo file. Previous audio retained.');const channels=Array.from({length:b.numberOfChannels},(_,i)=>{const c=new Float32Array(b.length);b.copyFromChannel(c,i);return c;});if(channels.length===1)channels.push(channels[0].slice());return {name:file.name,sampleRate:b.sampleRate,channels};}
 $('file').onchange=()=>{const f=$('file').files[0];if(f){saveWorkspace();stopPlayback();session.load(()=>decode(f));}$('file').value=''};function loadDefaultSample(){return session.load(async()=>{const r=await fetch('labs/audio/assets/audio/bach-prelude-72bpm.mp3');if(!r.ok)throw new Error('Sample unavailable');return decode(new File([await r.blob()],'Bach Prelude.mp3'));});}
 $('restore-original').onclick=()=>{
