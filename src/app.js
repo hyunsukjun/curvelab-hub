@@ -8,7 +8,7 @@ import {granularSourceMode} from './granular-source.js';
 import {NativeTransport} from './native-transport.js';
 import {PCMPlayer} from './player.js?v=hub-live-edits1';
 import {findSourceSeek} from '../labs/audio/src/source-seek.js';
-import {HubSession} from './session.js?v=curvelab-source-commit1';
+import {HubSession} from './session.js?v=curvelab-committed-output1';
 import {configuredOutputChannels} from './channel-output.js?v=hub-channel-output1';
 import {OUTPUT_GAIN_MIN_DB,OUTPUT_GAIN_MAX_DB,outputGainForPeak,outputGainLinear} from './output-gain.js?v=hub-live-edits1';
 import {renderJob} from './renderer.js?v=hub-ir-phases1';
@@ -345,11 +345,17 @@ function renderControls(){
  continueButton.disabled=v.activeJob||switching||!!blocked;
  $('lab-status').textContent=blocked||(session.reopened?`Editing ${v.current.label}`:active==='oscillator'?(mode==='resynthesis'?'File Resynthesis':'Oscillator + File IR'):active==='space'&&wavChannels()===2?'Stereo output':'');
 }
-async function prepareTarget(lab,candidate,valid,signal){
+async function prepareTarget(lab,candidate,valid,signal,retainedSpec=null){
  const rec=await getFrame(lab);if(!valid())return;
  rec.task=rec.task.catch(()=>{}).then(async()=>{
   if(!valid())return;const bridge=rec.frame.contentWindow.hubBridge;
-  rec.loadedId=null;await bridge.stop();bridge.restore(rec.defaults);
+  const defaults=structuredClone(rec.defaults);
+  if(retainedSpec){
+   if(lab==='space')defaults.dom.renderFormat.value=retainedSpec.format;
+   if(lab==='granular')defaults.dom.formatSelect.value=retainedSpec.settings.format;
+   if(lab==='granular'||lab==='oscillator')defaults.dom.durationInput.value=String(retainedSpec.settings.durationSeconds);
+  }
+  rec.loadedId=null;await bridge.stop();bridge.restore(defaults);
   bridge.meter?.setGainDb(0);
   await bridge.load(candidate.packet,{signal});if(!valid())return;
   if(lab==='granular')await bridge.routeSource(granularSourceMode(candidate.workspace.grainChannel));
@@ -365,8 +371,17 @@ function hasPendingProcessing(){
   ? processingSignature(active,currentSpec(),bridge.snapshot())!==entrySignature
   : dirty);
 }
+function holdsCommittedOutput(){
+ return ready&&!session.reopened&&session.committedLab===active&&!sourceInputChanged()
+  &&processingSignature(active,currentSpec(),currentBridge().snapshot())===entrySignature;
+}
+function bypassesLab(){
+ return holdsCommittedOutput()||Boolean(ready&&session.reopened?.recipe.bypassLab&&!sourceInputChanged()
+  &&processingSignature(active,currentSpec(),currentBridge().snapshot())===entrySignature);
+}
 function usesSavedOutput(changed=dirty){
- return !changed&&(!!session.reopened||Boolean(session.current?.exportPacket&&session.working.editState===session.editBase.editState));
+ if(holdsCommittedOutput())return true;
+ return !changed&&!!session.reopened;
 }
 function usesWorkingAudio(){
  const record=records.get('audio');
@@ -376,13 +391,15 @@ function auditionPlan(spec=currentSpec()){
  const processing=processingSignature(active,spec,currentBridge().snapshot());
  const gainDb=outputGain.valueAsNumber;
  const changed=processing!==entrySignature||gainDb!==entryOutputGain()||reopenedInputChanged();
+ const committed=holdsCommittedOutput();
+ const inputOnly=bypassesLab();
  const saved=usesSavedOutput(changed)?session.current:null;
  const direct=!session.reopened&&active==='audio'&&!changed
   &&processing===records.get('audio').neutralSignature&&gainDb===0?session.working.packet:null;
- return {key:(saved?'saved|':direct?'direct|':'rendered|')+processing,direct,saved,gainDb};
+ return {key:(committed?'committed|':saved?'saved|':direct?'direct|':inputOnly?'input|':'rendered|')+processing,direct,saved,gainDb,committed,inputOnly};
 }
 function matchingOutput(spec){
- if(!auditionCache||auditionCache.bypass)return null;
+ if(!auditionCache||auditionCache.bypass&&!auditionCache.inputOnly)return null;
  return auditionCache.working===session.working&&auditionCache.lab===active&&auditionCache.key===auditionPlan(spec).key
   ? auditionCache : null;
 }
@@ -391,7 +408,7 @@ async function prepareAudition({live=false}={}){
  const blocked=eligibility();
  if(blocked)throw new Error(blocked);
  const working=session.working,lab=active;
- const {key,direct,saved,gainDb}=auditionPlan();
+ const {key,direct,saved,gainDb,committed,inputOnly}=auditionPlan();
  const matches=output=>output?.working===working&&output.lab===lab&&output.key===key;
  if(matches(auditionCache))return auditionCache;
  if(matches(auditionRequest)&&!auditionRequest.controller.signal.aborted){
@@ -405,12 +422,14 @@ async function prepareAudition({live=false}={}){
  request.promise=(async()=>{
   try{
    let result;
-   if(saved||direct){
+   if(saved||direct||inputOnly){
     // Raw input needs its standard edges. A saved stage already has its own.
     const fade=direct&&(!direct.rendered||working.editState!==session.editBase.editState);
-    const directOutput=await session.prepareDirectOutput(saved?.packet||direct,fade,controller.signal);
+    const directOutput=await session.prepareDirectOutput(saved?.packet||direct||working.packet,fade,controller.signal);
+    const exportPacket=saved?.exportPacket||inputOnly&&session.reopened?.recipe.exportPacket||undefined;
+    if(exportPacket)directOutput.peak=await session.prepareDirectOutput(exportPacket,false,controller.signal).then(output=>output.peak);
     const gainReference=saved&&session.reopened?saved.outputGain:null;
-    result={...directOutput,exportPacket:saved?.exportPacket,bypass:true,gainDb,gainReference};
+    result={...directOutput,exportPacket,bypass:!!saved||!!direct,gainDb:committed?0:gainDb,gainReference,inputOnly};
    }else{
     paintStatus(live?'Updating playback…':'Preparing output…',true);
     await currentBridge().prepareOutput?.();
@@ -446,6 +465,7 @@ async function leaveLab(transition,{captureSource=false}={}){
   const outputGainDb=outputGain.valueAsNumber,pendingProcessing=hasPendingProcessing();
   const saveStage=pendingProcessing||captureSource&&sourceInputChanged();
   const directSource=!pendingProcessing&&saveStage&&usesWorkingAudio()&&!!auditionPlan().direct;
+  const bypassLab=bypassesLab();
   if(saveStage){
    const blocked=eligibility();if(blocked){showError(new Error(blocked));return false;}
    const bridge=currentBridge();
@@ -454,7 +474,7 @@ async function leaveLab(transition,{captureSource=false}={}){
    }
   }
   saveWorkspace();
-  return await transition(from,saveStage?currentSpec():null,outputGainDb,directSource);
+  return await transition(from,saveStage?currentSpec():null,outputGainDb,directSource,bypassLab);
  }finally{switching=false;renderControls();}
 }
 async function switchLab(lab){
@@ -462,10 +482,10 @@ async function switchLab(lab){
  if(!canLeaveLab())return false;
  if(lab===active){if(!ready)await syncEditor();return false;}
  const blocked=eligibility();if(blocked){showError(new Error(blocked));return false;}
- return leaveLab(async(from,spec,outputGainDb)=>{
+ return leaveLab(async(from,spec,outputGainDb,directSource,bypassLab)=>{
   if(!ready)return false;
   const moved=await session.handoff(from,spec,workspace,lab,
-   (candidate,valid,signal)=>prepareTarget(lab,candidate,valid,signal),{outputGainDb,prepared:spec?matchingOutput(spec):null});
+   (candidate,valid,signal)=>prepareTarget(lab,candidate,valid,signal),{outputGainDb,prepared:spec?matchingOutput(spec):null,bypassLab});
   if(moved&&!spec&&active!==lab){
    workspace=structuredClone(session.editorWorkspace);
    active=lab;entrySignature=null;auditionCache=null;outputPosition=0;lastClock=null;
@@ -477,9 +497,9 @@ async function switchLab(lab){
 async function selectSavedStage(id){
  const current=session.current;
  if(id===current?.id&&(!current.recipe||session.reopened)&&!hasPendingProcessing()&&!sourceInputChanged())return false;
- return leaveLab((from,spec,outputGainDb,directSource)=>{
+ return leaveLab((from,spec,outputGainDb,directSource,bypassLab)=>{
   if(spec)return session.handoff(from,spec,workspace,'audio',null,{
-   outputGainDb,restoreId:id,prepared:matchingOutput(spec),directSource,
+   outputGainDb,restoreId:id,prepared:matchingOutput(spec),directSource,bypassLab,
    confirmDiscard:()=>window.confirm('This draft exceeds the CurveLab audio limit. Discard it and open the selected stage?')
   });
   return session.restore(id);
@@ -487,14 +507,15 @@ async function selectSavedStage(id){
 }
 async function continueFromOutput(){
  const button=$('continue-output'),hadFocus=document.activeElement===button;
- return leaveLab(async(lab,spec,outputGainDb,directSource)=>{
+ return leaveLab(async(lab,spec,outputGainDb,directSource,bypassLab)=>{
   if(!ready||(!session.reopened&&!spec))return false;
   let reusedEditor=false;
+  const retainedSpec=spec||currentSpec();
   const moved=await session.handoff(lab,spec,workspace,lab,(candidate,valid,signal)=>{
    reusedEditor=true;
    ready=false;
-   return prepareTarget(lab,candidate,valid,signal);
-  },{outputGainDb,prepared:spec?matchingOutput(spec):null,directSource,continueOutput:true});
+   return prepareTarget(lab,candidate,valid,signal,retainedSpec);
+  },{outputGainDb,prepared:spec?matchingOutput(spec):null,directSource,bypassLab,continueOutput:true});
   if(!moved&&reusedEditor){
    // Preparing the next input reused the current iframe. Restore its previous draft on failure or cancellation.
    records.get(lab).loadedId=null;
@@ -642,6 +663,8 @@ $('restore-original').onclick=()=>{
 };
 $('export').onclick=async()=>{
  if(exporting||session.job||(!ready&&!usesSavedOutput())||!session.current?.packet.channels[0].length)return;
+ // Commit the visible editor snapshot before its queued change message can cancel this request.
+ if(ready)syncLabSettings(records.get(active));
  const stage=session.current,working=session.working,lab=active;
  exporting=true;
  $('export').setAttribute('aria-busy','true');
@@ -651,7 +674,7 @@ $('export').onclick=async()=>{
   if(session.current!==stage||session.working!==working||active!==lab)return;
   if(ready&&output.key!==auditionPlan().key)return;
   const gain=outputGain.valueAsNumber;
-  const {packet:p}=output.bypass?{packet:output.exportPacket||output.packet}
+  const {packet:p}=output.bypass&&gain===output.gainDb?{packet:output.exportPacket||output.packet}
    :await session.finishOutput(output,gain,undefined,{preserve:true,wavOnly:true});
   if(session.current!==stage||session.working!==working||active!==lab||gain!==outputGain.valueAsNumber
    ||ready&&output.key!==auditionPlan().key)return;

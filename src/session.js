@@ -23,7 +23,7 @@ function outputFrameCount(lab,input,spec){
  return frames+(impulse?impulse.length-1:0);
 }
 export class HubSession{
- constructor(renderer,change=()=>{}){this.renderer=renderer;this.change=change;this.nodes=[];this.deletedStages=[];this.stageDeletionRedo=[];this.undoEdits=[];this.redoEdits=[];this.current=null;this.working=null;this.reopened=null;this.preview=null;this.job=null;this.serial=0;this.revision=0;this.restoreCount=0;this.status='Loading Bach Prelude…';this.error='';this.limitFailure=null;this.progress=0;}
+ constructor(renderer,change=()=>{}){this.renderer=renderer;this.change=change;this.nodes=[];this.deletedStages=[];this.stageDeletionRedo=[];this.undoEdits=[];this.redoEdits=[];this.current=null;this.working=null;this.reopened=null;this.committedLab=null;this.preview=null;this.job=null;this.serial=0;this.revision=0;this.restoreCount=0;this.status='Loading Bach Prelude…';this.error='';this.limitFailure=null;this.progress=0;}
  view(){
   const n=this.current,w=this.working;
   return {current:n?{id:n.id,inputId:w.id,label:n.label,kind:n.kind,parentId:n.parentId,frames:w.packet.channels[0].length,sampleRate:w.packet.sampleRate,channels:w.packet.channels.length}:null,
@@ -95,6 +95,7 @@ export class HubSession{
  get editorWorkspace(){return (this.reopened||this.current)?.workspace;}
  rememberWorkspace(workspace){if(this.current)(this.reopened||this.current).workspace=clone(workspace);}
  resetWorking(n,reopen=false){
+  this.committedLab=null;
   this.current=n;
   const recipe=reopen?n.recipe:null;
   this.reopened=recipe?{recipe,workspace:clone(recipe.workspace)}:null;
@@ -243,7 +244,7 @@ export class HubSession{
   }finally{signal.removeEventListener('abort',cancel);}
  }
  // Prepare the target while the current work remains authoritative. A null spec passes the working audio through.
- async handoff(lab,spec,workspace,target,prepareTarget,{outputGainDb=0,restoreId=null,prepared=null,directSource=false,continueOutput=false,confirmDiscard=null}={}){
+ async handoff(lab,spec,workspace,target,prepareTarget,{outputGainDb=0,restoreId=null,prepared=null,directSource=false,bypassLab=false,continueOutput=false,confirmDiscard=null}={}){
   const restoreStage=restoreId===null?null:this.nodes.find(node=>node.id===restoreId);
   if(this.job||!this.current||!this.working.packet.channels[0].length)return false;
   if(restoreId!==null&&(!restoreStage||!spec))return false;
@@ -261,13 +262,22 @@ export class HubSession{
     if(!valid())return false;
     input.workspace=nextWorkspace;
     if(reopened)this.resetWorking(input);
+    this.committedLab=continueOutput?target:null;
     if(continueOutput)this.restoreCount++;
     this.preview=null;this.revision++;
     this.job=null;this.progress=1;this.status=target[0].toUpperCase()+target.slice(1)+' ready · Working audio retained';
     this.emit();return true;
    }
-   let output;
-   if(directSource){
+   let output,bypassExport;
+   if(bypassLab){
+    if(reopened?!reopened.recipe.bypassLab:this.committedLab!==lab)throw new Error('No committed output to adjust');
+    bypassExport=reopened?reopened.recipe.exportPacket:input.exportPacket;
+    const base=prepared||{
+     packet:working.packet,exportPacket:bypassExport,
+     peak:await measureOutputPeak((bypassExport||working.packet).channels,controller.signal)
+    };
+    output=await this.finishOutput(base,outputGainDb,controller.signal,{preserve:true});
+   }else if(directSource){
     if(lab!=='audio'||reopened||outputGainDb!==0)throw new Error('Invalid source-only handoff');
     this.capacity({recipe:working},[],[],working.packet.channels[0].length*2*Float32Array.BYTES_PER_ELEMENT);
     const direct=await this.prepareDirectOutput(working.packet,!working.packet.rendered||working.editState!==this.editBase.editState,controller.signal);
@@ -291,13 +301,17 @@ export class HubSession{
    candidate.renderSpec={lab,spec:clone(spec)};
    // The working input is immutable here. Keep it even if its parent is deleted.
    candidate.recipe={packet:working.packet,editState:working.editState,workspace:recipeWorkspace,outputGainDb,inputLabel};
+   if(bypassLab){
+    candidate.recipe.bypassLab=true;
+    if(bypassExport)candidate.recipe.exportPacket=bypassExport;
+   }
    if(outputGain.requestedGainDb!==0||outputGain.limited)candidate.outputGain=outputGain;
    this.capacity(candidate);
    if(!restoreStage){
     this.status='Preparing '+target+'…';this.progress=.9;this.emit();
     await prepareTarget(candidate,valid,controller.signal);if(!valid())return false;
    }
-   this.publish(candidate);this.job=null;this.progress=1;
+   this.publish(candidate);this.committedLab=continueOutput?target:null;this.job=null;this.progress=1;
    if(restoreStage){
     this.resetWorking(restoreStage,true);this.restoreCount++;
     this.status='Saved '+candidate.label+' · Restored '+restoreStage.label;
