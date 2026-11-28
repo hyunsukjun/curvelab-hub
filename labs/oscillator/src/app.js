@@ -1,3 +1,4 @@
+import {eraseModifier, firstPointModifier, eraseAtPoint, verticalTargets} from "../../../src/curve-point-gesture.js";
 import {createSourceLoadGate, fetchDefaultSource} from "./default-source.js?v=20261029-bach1";
 import {beginVerticalGroup, moveVerticalGroup, restoreVerticalGroup, verticalGroupSuffix, drawVerticalGroupRing} from "./curve-group-edit.js?v=20261027-shift1";
 import {canvasAxisWidth, drawEditorGrid, frequencyTicks, frequencyLabel, spacedMarks, canvasLabelFont} from "./canvas-grid.js?v=20261026-graphite1";
@@ -84,9 +85,6 @@ const canvas = document.getElementById("curveCanvas");
 const ctx = canvas.getContext("2d");
 const penTool = document.getElementById("penTool");
 const eraserTool = document.getElementById("eraserTool");
-const eraseModifier = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgentData?.platform || "")
-  ? "altKey"
-  : "ctrlKey";
 
 const modeButtons = {
   basePitch: document.getElementById("basePitchMode"),
@@ -156,6 +154,7 @@ let selectedPoint = null;
 let curvePointerId = null;
 let verticalDrag = null;
 let shiftHeld = false;
+let firstPointOnlyHeld = false;
 let hoverPoint = null;
 let dragging = false;
 let playheadSeconds = 0;
@@ -1405,24 +1404,32 @@ impulseLengthInput.addEventListener("change", async () => {
   }
 });
 
-function isErasing(event) {
-  return selectedTool === "eraser" || Boolean(event?.[eraseModifier]);
+function hoveredIndex() {
+  return hoverPoint;
+}
+
+function isErasing(event, index) {
+  return eraseAtPoint(selectedTool, Boolean(event?.[eraseModifier]), index);
 }
 
 function updateEraseCursor(event) {
-  if (event) shiftHeld = Boolean(event.shiftKey);
+  if (event) {
+    shiftHeld = Boolean(event.shiftKey);
+    firstPointOnlyHeld = Boolean(event[firstPointModifier]);
+  }
   const editable = Boolean(activeCurve);
-  const erasing = editable && curvePointerId == null && isErasing(event);
+  const erasing = editable && curvePointerId == null && isErasing(event, hoveredIndex());
   canvas.classList.toggle("eraseMode", erasing);
-  canvas.style.cursor = !editable ? "default" : verticalDrag || (curvePointerId == null && shiftHeld && !erasing)
+  canvas.style.cursor = !editable ? "default" : verticalDrag || (curvePointerId == null && (shiftHeld || hoveredIndex() === 0) && !erasing)
     ? "ns-resize" : erasing ? "" : hoverPoint != null ? "pointer" : "crosshair";
 }
 
 function getVerticalPoints() {
   if (verticalDrag) return verticalDrag.points.map(entry => entry.point);
-  if (curvePointerId != null || !shiftHeld || canvas.classList.contains("eraseMode") || !(Boolean(activeCurve))) return [];
-  const index = hoverPoint;
-  return index != null && index >= 0 ? curves[activeCurve].slice(index) : [];
+  if (curvePointerId != null || canvas.classList.contains("eraseMode") || !(Boolean(activeCurve))) return [];
+  const index = hoveredIndex();
+  if (index == null || index < 0 || (!shiftHeld && index !== 0)) return [];
+  return verticalTargets(curves[activeCurve], index, firstPointOnlyHeld && !shiftHeld);
 }
 
 function groupPointerY(event, anchorX) {
@@ -1433,7 +1440,8 @@ function beginCurveGroup(event, index) {
   event.preventDefault();
   if (index == null || index < 0) return false;
   const anchorX = curves[activeCurve][index].x;
-  const group = beginVerticalGroup(curves[activeCurve], index, groupPointerY(event, anchorX));
+  const targets = verticalTargets(curves[activeCurve], index, event[firstPointModifier] && !event.shiftKey);
+  const group = beginVerticalGroup(targets, 0, groupPointerY(event, anchorX));
   group.curveName = activeCurve;
   group.anchorX = anchorX;
   group.wasEdited = editedCurves[activeCurve];
@@ -1504,7 +1512,7 @@ canvas.addEventListener("pointerdown", (event) => {
   if (event.button !== 0 || curvePointerId != null) return;
   const point = canvasPoint(event);
   const found = findPoint(point);
-  if (isErasing(event)) {
+  if (isErasing(event, found)) {
     event.preventDefault();
     const curve = curves[activeCurve];
     if (found > 0 && found < curve.length - 1) {
@@ -1516,7 +1524,7 @@ canvas.addEventListener("pointerdown", (event) => {
     }
     return;
   }
-  if (event.shiftKey) {
+  if (event.shiftKey || found === 0) {
     selectedPoint = found >= 0 ? found : null;
     hoverPoint = selectedPoint;
     beginCurveGroup(event, found);
@@ -1535,9 +1543,9 @@ canvas.addEventListener("pointerdown", (event) => {
 canvas.addEventListener("pointermove", (event) => {
   if (curvePointerId != null && event.pointerId !== curvePointerId) return;
   if (verticalDrag) { moveCurveGroup(event); return; }
-  updateEraseCursor(event);
   const point = canvasPoint(event);
   hoverPoint = findPoint(point);
+  updateEraseCursor(event);
   if (dragging && selectedPoint != null) updatePoint(selectedPoint, point);
   else draw();
 });
@@ -1566,20 +1574,23 @@ window.addEventListener("keydown", (event) => {
     draw();
     return;
   }
+  const previousFirstOnly = firstPointOnlyHeld;
   const previousShift = shiftHeld;
   const previousErase = canvas.classList.contains("eraseMode");
   updateEraseCursor(event);
-  if (previousShift !== shiftHeld || previousErase !== canvas.classList.contains("eraseMode")) draw();
+  if (previousFirstOnly !== firstPointOnlyHeld || previousShift !== shiftHeld || previousErase !== canvas.classList.contains("eraseMode")) draw();
 });
 window.addEventListener("keyup", (event) => {
+  const previousFirstOnly = firstPointOnlyHeld;
   const previousShift = shiftHeld;
   const previousErase = canvas.classList.contains("eraseMode");
   updateEraseCursor(event);
-  if (previousShift !== shiftHeld || previousErase !== canvas.classList.contains("eraseMode")) draw();
+  if (previousFirstOnly !== firstPointOnlyHeld || previousShift !== shiftHeld || previousErase !== canvas.classList.contains("eraseMode")) draw();
 });
 window.addEventListener("blur", () => {
   finishCurveDrag(true);
   shiftHeld = false;
+  firstPointOnlyHeld = false;
   hoverPoint = null;
   updateEraseCursor();
   draw();

@@ -1,4 +1,4 @@
-import {finishIRPacket,processPacket,synthesizeIRSource} from './render-job.js?v=hub-ir-phases1';
+import {finishIRPacket,processPacket,synthesizeIRSource} from './render-job.js?v=hub-bank-first-point1';
 self.onmessage=async({data})=>{
  const onProgress=progress=>postMessage({progress});
  try{

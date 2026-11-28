@@ -1,4 +1,13 @@
 export default {
+  "timbre.bankModeHelp": ["Bandpass Bank", "并行通过多个窄频带。Count 设置频带数量，Layout 设置间距。"],
+  "timbre.bankSpacingHelp": ["间距", "中央使用所选排列，顶端的相邻频带间距为 10 Hz，底端将原始间距加倍。第一个频带保持在参考频率。"],
+  "timbre.bankQHelp": ["Q · Round / Focused / Sharp", "增大 Q 会缩窄各中心频率附近的通带。"],
+  "timbre.resonatorModeHelp": ["Resonator", "Count 设置共振点数量，Layout 设置间距。"],
+  "timbre.resonatorFrequencyParamHelp": ["Frequency · Bandpass Bank 20 Hz–6 kHz / Resonator 60 Hz–6 kHz", "移动整组的基准频率。"],
+  "timbre.resonatorDecayParamHelp": ["Decay · 0.03–2 s","设置每个共振模式衰减约60 dB所需的时间。持续输入可能使声音保持更久。"],
+  "timbre.resonatorMixParamHelp": ["Mix · 0–100%", "混合原声和处理后的声音。100% 时仅输出处理后的声音。"],
+  "timbre.resonatorCount": "选择中心频率的数量。",
+  "timbre.resonatorPreset": "Spacing 在中央时，Harmonic 使用整数倍频，Odd Harmonics 使用奇数倍频，Multiplier 重复使用 1、1.5、2 和 2.5 倍频。",
   "source.source-pen": "编辑源音频波形的音量控制点和 Lab 的曲线控制点。再次单击返回音频选区模式。",
   "source.source-eraser": "删除音量或曲线控制点。音频片段保持不变。",
   "source.source-reverse": "倒放整个工作音频，包括当前的音量和淡入淡出效果。选区和缩放不限制处理范围。撤销可还原。",

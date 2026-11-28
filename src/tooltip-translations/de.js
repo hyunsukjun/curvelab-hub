@@ -1,4 +1,13 @@
 export default {
+  "timbre.bankModeHelp": ["Bandpass Bank", "Lässt mehrere schmale Frequenzbänder parallel durch. Count bestimmt die Anzahl, Layout den Abstand."],
+  "timbre.bankSpacingHelp": ["Abstand", "In der Mitte gilt die gewählte Anordnung. Oben liegen benachbarte Bänder 10 Hz auseinander, unten verdoppeln sich die ursprünglichen Abstände. Das erste Band bleibt auf der Referenzfrequenz."],
+  "timbre.bankQHelp": ["Q · Round / Focused / Sharp", "Ein höherer Q-Wert verengt jedes Durchlassband um seine Mittenfrequenz."],
+  "timbre.resonatorModeHelp": ["Resonator", "Count bestimmt die Anzahl der Resonanzen, Layout ihren Abstand."],
+  "timbre.resonatorFrequencyParamHelp": ["Frequency · Bandpass Bank 20 Hz–6 kHz / Resonator 60 Hz–6 kHz", "Verschiebt die Bezugsfrequenz der Gruppe."],
+  "timbre.resonatorDecayParamHelp": ["Decay · 0.03–2 s","Bestimmt die Zeit, in der jeder Resonanzmodus um etwa 60 dB abklingt. Ein anhaltendes Eingangssignal kann den Klang verlängern."],
+  "timbre.resonatorMixParamHelp": ["Mix · 0–100%", "Mischt Original und verarbeitetes Signal. Bei 100 % ist nur das verarbeitete Signal zu hören."],
+  "timbre.resonatorCount": "Anzahl der Mittenfrequenzen wählen.",
+  "timbre.resonatorPreset": "Bei mittlerem Spacing verwendet Harmonic alle ganzzahligen Vielfachen, Odd Harmonics nur die ungeraden. Multiplier wiederholt die Faktoren 1, 1,5, 2 und 2,5.",
   "source.source-pen": "Bearbeiten Sie Lautstärkepunkte in der Quellwellenform und Kurvenpunkte im Lab. Erneut klicken, um zur Audioauswahl zurückzukehren.",
   "source.source-eraser": "Entfernen Sie einen Lautstärke- oder Kurvenpunkt. Audiobereiche bleiben erhalten.",
   "source.source-reverse": "Kehrt das gesamte Arbeitsaudio zeitlich um, einschließlich der aktuellen Lautstärke und Fades. Auswahl und Zoom begrenzen den Bereich nicht. Rückgängig stellt das Audio wieder her.",

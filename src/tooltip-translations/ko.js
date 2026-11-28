@@ -1,4 +1,13 @@
 export default {
+  "timbre.bankModeHelp": ["Bandpass Bank", "여러 개의 좁은 주파수 대역을 병렬로 통과시킵니다. Count는 대역 개수, Layout은 대역 간격을 정합니다."],
+  "timbre.bankSpacingHelp": ["간격", "중앙은 선택한 배치, 맨 위는 대역 사이 10 Hz, 맨 아래는 원래 간격의 두 배입니다. 첫 대역은 기준 주파수에 고정됩니다."],
+  "timbre.bankQHelp": ["Q · Round / Focused / Sharp", "Q를 높이면 각 중심 주파수 주위의 통과 폭이 좁아집니다."],
+  "timbre.resonatorModeHelp": ["Resonator", "Count는 공명점 개수를, Layout은 공명점 사이의 간격을 정합니다."],
+  "timbre.resonatorFrequencyParamHelp": ["Frequency · Bandpass Bank 20 Hz–6 kHz / Resonator 60 Hz–6 kHz", "전체 대역의 기준 주파수를 옮깁니다."],
+  "timbre.resonatorDecayParamHelp": ["Decay · 0.03–2 s","각 공명 모드가 약 60 dB 감쇠하는 시간을 정합니다. 입력이 계속되면 소리가 더 오래 지속될 수 있습니다."],
+  "timbre.resonatorMixParamHelp": ["Mix · 0–100%", "원음과 처리음을 섞습니다. 100%에서는 처리음만 들립니다."],
+  "timbre.resonatorCount": "중심 주파수 개수를 고릅니다.",
+  "timbre.resonatorPreset": "Spacing 중앙에서 Harmonic은 기준음의 1·2·3…배, Odd Harmonics는 1·3·5…배를 씁니다. Multiplier는 1·1.5·2·2.5배를 반복합니다.",
   "source.source-pen": "소스 파형의 음량 점과 Lab의 커브 점을 편집합니다. 다시 누르면 구간 선택으로 돌아갑니다.",
   "source.source-eraser": "음량 점이나 커브 점을 지웁니다. 음원 구간은 유지됩니다.",
   "source.source-reverse": "현재 음량과 페이드를 반영한 작업 음원 전체를 거꾸로 만듭니다. 선택 구간과 확대 상태는 처리 범위를 제한하지 않습니다. Undo로 복원할 수 있습니다.",

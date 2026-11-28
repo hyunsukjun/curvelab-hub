@@ -30,7 +30,7 @@ function outputPacket(result){
 export async function processPacket(lab,p,spec,{signal,onProgress,reference=false,cooperative=true}={}){
  const audio=audioBuffer(p);let out;
  if(lab==='audio'||lab==='timbre'){
-  const m=await import(`../labs/${lab}/src/offline-render.js`);
+  const m=await import(`../labs/${lab}/src/offline-render.js?v=hub-bank-first-point1`);
   out=await m.renderOffline({audioBuffer:audio,...spec,pcmOnly:true,signal,onProgress});
   return {rendered:true,sampleRate:out.sampleRate,channels:[out.left,out.right],boundary:'Existing 48k output / 10ms fade'};
  }

@@ -84,9 +84,10 @@
                 <strong>Keyboard shortcuts</strong>
                 <h3>Curves / Output Time</h3>
                 <dl>
+                  <dt>Drag the first point</dt><dd>Move the whole curve vertically. Hold Command on Mac or Ctrl on PC to move only the first point.</dd>
                   <dt>Shift-drag</dt><dd>Move this and following points vertically. X stays fixed.</dd>
                   <dt>Option-click</dt><dd>Mac: delete a point. PC: Ctrl-click. Endpoints stay protected.</dd>
-                  <dt>Esc</dt><dd>Cancel the pending Shift group drag.</dd>
+                  <dt>Esc</dt><dd>Cancel the current vertical drag.</dd>
                 </dl>
                 <h3>Edit Audio / Source Time</h3>
                 <dl>
@@ -153,7 +154,7 @@
         </section>
         <div class="canvasFrame">
           <div class="curveTimeLabel">Curves / Output Time</div>
-          <canvas id="waveCanvas" width="1400" height="620" aria-label="Click to add or drag to move a point. Shift-drag a point and all points to its right vertically; X stays fixed. Esc cancels the group drag. Mac: Option-click to delete; PC: Ctrl-click."></canvas>
+          <canvas id="waveCanvas" width="1400" height="620" aria-label="Click to add a point. Drag the first point to move the whole curve vertically. Hold Command on Mac or Ctrl on PC to move only the first point. Drag other points to move them. Shift-drag a point and all points to its right vertically; X stays fixed. Esc cancels the group drag. Mac: Option-click to delete; PC: Ctrl-click."></canvas>
         </div>
 
 
@@ -203,7 +204,7 @@
     </div>
 
     <script src="src/file-help.js?v=20261028-readout-guide1" type="module"></script>
-    <script src="src/app.js?v=20261108-relative-gain1" type="module"></script>
+    <script src="src/app.js?v=hub-bank-first-point1" type="module"></script>
     <div id="stretchHelp" class="parameterHelp" role="tooltip" hidden><strong>Speed · −2× to +2×</strong><span>Change source playback speed. Negative values reverse the sound; zero freezes the source position.</span></div>
     <div id="pitchHelp" class="parameterHelp" role="tooltip" hidden><strong>Pitch · −2400 to +2400 cents</strong><span>Shift pitch down or up by as much as two octaves. 1200 cents = one octave.</span></div>
     <div id="panHelp" class="parameterHelp" role="tooltip" hidden><strong>Pan · Left / Right</strong><span>Move sound across the stereo field. Top = Left · Center = Center · Bottom = Right.</span></div>

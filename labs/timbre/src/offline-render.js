@@ -1,6 +1,12 @@
+import {bankTailSeconds, bankQFromNorm, DEFAULT_BANK_Q, createBandpassBank, tuneBandpassBank, filterBankChannel} from "../../../src/timbre-bandpass-bank.js";
 import { exportWav } from "./wav-export.js?v=20261025-fade10";
 import { encodeWav } from "./wav-encoder.js?v=20261006-stream-01";
 import { prepareWavChannels } from "./wav-output.js?v=20261025-fade10";
+import {
+  RESONATOR_DEFAULTS, RESONATOR_DEFAULT_NORMALIZED,
+  resonatorFrequencyFromNorm, resonatorDecayFromNorm, resonatorMixFromNorm,
+  resonatorCountFor, createResonatorState, processResonator, processResonatorChannel, resonatorTailSeconds,
+} from "../../../src/timbre-resonator.js";
 function valueAt(curve, x) {
   if (!curve || curve.length === 0) return 0;
   if (x <= curve[0].x) return curve[0].y;
@@ -250,6 +256,7 @@ function orderedEffects(settings) {
     if (name === "flanger") return settings.flangerEnabled;
     if (name === "chorus") return settings.chorusEnabled;
     if (name === "delay") return settings.delayEnabled;
+    if (name === "resonator") return settings.resonatorEnabled;
     return false;
   });
 }
@@ -268,7 +275,10 @@ export async function renderOffline({ audioBuffer, curves, settings, signal, onP
   const right = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : left;
   const outputDuration = audioBuffer.duration;
   const sourceLength = Math.max(1, Math.ceil(outputDuration * sampleRate));
-  const tailDuration = delayTailSeconds(curves, settings);
+  const isFilterBank = settings.resonatorModel === "bandpass";
+  const frequencyMinHz = isFilterBank ? settings.bankFrequencyMinHz : undefined;
+  const resonanceTail = isFilterBank ? bankTailSeconds(curves, settings, sampleRate) : resonatorTailSeconds(curves, settings);
+  const tailDuration = delayTailSeconds(curves, settings) + resonanceTail;
   const outLength = sourceLength + Math.round(tailDuration * sampleRate);
   const outL = new Float32Array(outLength);
   const outR = new Float32Array(outLength);
@@ -289,6 +299,12 @@ export async function renderOffline({ audioBuffer, curves, settings, signal, onP
   const chorusRightState = { buffer: new Float32Array(modulationBufferLength), damp: 0, delayMs: 18, phase: 0.5, index: 0 };
   const delayLeftState = { buffer: new Float32Array(delayBufferLength), damp: 0, delayMs: 350, index: 0 };
   const delayRightState = { buffer: new Float32Array(delayBufferLength), damp: 0, delayMs: 350, index: 0 };
+  // A globally dry Resonator must preserve the old duration and sample path.
+  const resonatorEnabled = resonanceTail > 0;
+  const resonatorLeftState = resonatorEnabled && !isFilterBank ? createResonatorState(sampleRate, resonatorCountFor(settings)) : null;
+  const resonatorRightState = resonatorEnabled && !isFilterBank ? createResonatorState(sampleRate, resonatorCountFor(settings)) : null;
+  const bank = resonatorEnabled && isFilterBank
+    ? createBandpassBank(sampleRate, settings.resonatorCount ?? 8, settings.resonatorPreset, settings.bankLowHarmonics === true, settings.bankProfile) : null;
   const gain = settings.outputGain ?? 0.95;
   const lowPassEnabled = settings.lowPassEnabled ?? false;
   const highPassEnabled = settings.highPassEnabled ?? false;
@@ -305,71 +321,115 @@ export async function renderOffline({ audioBuffer, curves, settings, signal, onP
     combEnabled,
     flangerEnabled,
     chorusEnabled,
-    delayEnabled
+    delayEnabled,
+    resonatorEnabled
   });
   let peak = 0;
   let lastProgress = 0;
   let lastYield = performance.now();
 
-  for (let i = 0; i < outLength; i += 1) {
-    if (signal?.aborted) {
-      throw new DOMException("Render cancelled", "AbortError");
-    }
+  // Measure at the bank's insertion point. Reuse the output buffers for the
+  // intermediate stereo signal so downstream effects receive exactly one gain.
+  const bankIndex = bank && settings.bankLevelMatching ? effectOrder.indexOf("resonator") : -1;
+  const totalFrames = bankIndex < 0 ? outLength : outLength * 2;
+  let measuringBank = bankIndex >= 0;
+  let passOrder = measuringBank ? effectOrder.slice(0, bankIndex + 1) : effectOrder;
+  let bankInputEnergy = 0, bankOutputEnergy = 0, bankPeak = 0;
+  let bankGain = 1;
 
-    const norm = sourceLength > 1 ? Math.min(1, i / (sourceLength - 1)) : 1;
-    const lowPassCutoff = cutoffFromNorm(valueAt(curves.lowpass, norm), sampleRate);
-    const highPassCutoff = cutoffFromNorm(valueAt(curves.highpass, norm), sampleRate);
-    const bandPassCenter = cutoffFromNorm(valueAt(curves.bandpassCenter, norm), sampleRate);
-    const bandPassWidth = valueAt(curves.bandpassWidth, norm);
-    const bandPassQ = qFromWidthNorm(bandPassWidth);
-    const combDelayMs = combDelayMsFromNorm(valueAt(curves.combDelay, norm));
-    const combFeedback = combFeedbackFromNorm(valueAt(curves.combFeedback, norm));
-    const combMix = combMixFromNorm(valueAt(curves.combMix, norm));
-    const flangerDelayMs = flangerDelayMsFromNorm(valueAt(curves.flangerDelay, norm));
-    const flangerDepthMs = flangerDepthMsFromNorm(valueAt(curves.flangerDepth, norm));
-    const flangerRateHz = flangerRateHzFromNorm(valueAt(curves.flangerRate, norm));
-    const flangerFeedback = modulationFeedbackFromNorm(valueAt(curves.flangerFeedback, norm));
-    const flangerMix = curves.flangerMix?.length ? combMixFromNorm(valueAt(curves.flangerMix, norm)) : 0.54;
-    const chorusDelayMs = chorusDelayMsFromNorm(valueAt(curves.chorusDelay, norm));
-    const chorusDepthMs = chorusDepthMsFromNorm(valueAt(curves.chorusDepth, norm));
-    const chorusRateHz = chorusRateHzFromNorm(valueAt(curves.chorusRate, norm));
-    const chorusMix = combMixFromNorm(valueAt(curves.chorusMix, norm));
-    const delayTimeMs = delayTimeMsFromNorm(valueAt(curves.delayTime, norm));
-    const delayFeedback = modulationFeedbackFromNorm(valueAt(curves.delayFeedback, norm));
-    const delayMix = combMixFromNorm(valueAt(curves.delayMix, norm));
-    let renderedL = i < sourceLength ? (left[i] || 0) : 0;
-    let renderedR = i < sourceLength ? (right[i] || 0) : 0;
-    for (const effectName of effectOrder) {
-      if (effectName === "lowpass") {
-        renderedL = processLowPass(renderedL, lowPassLeftState, lowPassCutoff, sampleRate);
-        renderedR = processLowPass(renderedR, lowPassRightState, lowPassCutoff, sampleRate);
-      } else if (effectName === "highpass") {
-        renderedL = processHighPass(renderedL, highPassLeftState, highPassCutoff, sampleRate);
-        renderedR = processHighPass(renderedR, highPassRightState, highPassCutoff, sampleRate);
-      } else if (effectName === "bandpass") {
-        renderedL = processBandPass(renderedL, bandPassLeftState, bandPassCenter, bandPassQ, sampleRate);
-        renderedR = processBandPass(renderedR, bandPassRightState, bandPassCenter, bandPassQ, sampleRate);
-      } else if (effectName === "comb") {
-        renderedL = processComb(renderedL, combLeftState, combDelayMs, combFeedback, combMix, sampleRate);
-        renderedR = processComb(renderedR, combRightState, combDelayMs, combFeedback, combMix, sampleRate);
-      } else if (effectName === "flanger") {
-        renderedL = processFlanger(renderedL, flangerLeftState, flangerDelayMs, flangerDepthMs, flangerRateHz, flangerFeedback, sampleRate, flangerMix);
-        renderedR = processFlanger(renderedR, flangerRightState, flangerDelayMs, flangerDepthMs, flangerRateHz, flangerFeedback, sampleRate, flangerMix);
-      } else if (effectName === "chorus") {
-        renderedL = processChorus(renderedL, chorusLeftState, chorusDelayMs, chorusDepthMs, chorusRateHz, chorusMix, sampleRate);
-        renderedR = processChorus(renderedR, chorusRightState, chorusDelayMs, chorusDepthMs, chorusRateHz, chorusMix, sampleRate);
-      } else if (effectName === "delay") {
-        renderedL = processDelay(renderedL, delayLeftState, delayTimeMs, delayFeedback, delayMix, sampleRate);
-        renderedR = processDelay(renderedR, delayRightState, delayTimeMs, delayFeedback, delayMix, sampleRate);
+  for (let frame = 0; frame < totalFrames; frame += 1) {
+    if (signal?.aborted) throw new DOMException("Render cancelled", "AbortError");
+    const afterBank = frame >= outLength;
+    const i = afterBank ? frame - outLength : frame;
+    if (frame === outLength) {
+      measuringBank = false;
+      passOrder = effectOrder.slice(bankIndex + 1);
+      const inputRms = Math.sqrt(bankInputEnergy / (2 * sourceLength));
+      const outputRms = Math.sqrt(bankOutputEnergy / (2 * sourceLength));
+      // Do not lift digital silence or tiny residuals. Include the entire
+      // tail in the peak bound, and keep both channels at the same gain.
+      if (inputRms > 1e-5 && outputRms > 1e-7 && bankPeak > 0) {
+        bankGain = Math.max(1, Math.min(inputRms / outputRms, 10 ** (-1 / 20) / bankPeak, 10 ** (48 / 20)));
       }
     }
-    renderedL = limitSample(renderedL * gain);
-    renderedR = limitSample(renderedR * gain);
+
+    let renderedL = afterBank ? outL[i] * bankGain : (left[i] || 0);
+    let renderedR = afterBank ? outR[i] * bankGain : (right[i] || 0);
+    if (passOrder.length) {
+      const norm = sourceLength > 1 ? Math.min(1, i / (sourceLength - 1)) : 1;
+      const lowPassCutoff = cutoffFromNorm(valueAt(curves.lowpass, norm), sampleRate);
+      const highPassCutoff = cutoffFromNorm(valueAt(curves.highpass, norm), sampleRate);
+      const bandPassCenter = cutoffFromNorm(valueAt(curves.bandpassCenter, norm), sampleRate);
+      const bandPassWidth = valueAt(curves.bandpassWidth, norm);
+      const bandPassQ = qFromWidthNorm(bandPassWidth);
+      const combDelayMs = combDelayMsFromNorm(valueAt(curves.combDelay, norm));
+      const combFeedback = combFeedbackFromNorm(valueAt(curves.combFeedback, norm));
+      const combMix = combMixFromNorm(valueAt(curves.combMix, norm));
+      const flangerDelayMs = flangerDelayMsFromNorm(valueAt(curves.flangerDelay, norm));
+      const flangerDepthMs = flangerDepthMsFromNorm(valueAt(curves.flangerDepth, norm));
+      const flangerRateHz = flangerRateHzFromNorm(valueAt(curves.flangerRate, norm));
+      const flangerFeedback = modulationFeedbackFromNorm(valueAt(curves.flangerFeedback, norm));
+      const flangerMix = curves.flangerMix?.length ? combMixFromNorm(valueAt(curves.flangerMix, norm)) : 0.54;
+      const chorusDelayMs = chorusDelayMsFromNorm(valueAt(curves.chorusDelay, norm));
+      const chorusDepthMs = chorusDepthMsFromNorm(valueAt(curves.chorusDepth, norm));
+      const chorusRateHz = chorusRateHzFromNorm(valueAt(curves.chorusRate, norm));
+      const chorusMix = combMixFromNorm(valueAt(curves.chorusMix, norm));
+      const delayTimeMs = delayTimeMsFromNorm(valueAt(curves.delayTime, norm));
+      const delayFeedback = modulationFeedbackFromNorm(valueAt(curves.delayFeedback, norm));
+      const delayMix = combMixFromNorm(valueAt(curves.delayMix, norm));
+      const resonatorFrequency = resonatorEnabled
+        ? (curves.resonatorFrequency?.length ? resonatorFrequencyFromNorm(valueAt(curves.resonatorFrequency, norm), frequencyMinHz) : RESONATOR_DEFAULTS.frequencyHz) : 0;
+      const resonatorDecay = resonatorLeftState
+        ? resonatorDecayFromNorm(curves.resonatorDecay?.length ? valueAt(curves.resonatorDecay, norm) : RESONATOR_DEFAULT_NORMALIZED.decay) : 0;
+      const resonatorMix = resonatorLeftState
+        ? resonatorMixFromNorm(curves.resonatorMix?.length ? valueAt(curves.resonatorMix, norm) : RESONATOR_DEFAULTS.mix) : 0;
+      for (const effectName of passOrder) {
+        if (effectName === "lowpass") {
+          renderedL = processLowPass(renderedL, lowPassLeftState, lowPassCutoff, sampleRate);
+          renderedR = processLowPass(renderedR, lowPassRightState, lowPassCutoff, sampleRate);
+        } else if (effectName === "highpass") {
+          renderedL = processHighPass(renderedL, highPassLeftState, highPassCutoff, sampleRate);
+          renderedR = processHighPass(renderedR, highPassRightState, highPassCutoff, sampleRate);
+        } else if (effectName === "bandpass") {
+          renderedL = processBandPass(renderedL, bandPassLeftState, bandPassCenter, bandPassQ, sampleRate);
+          renderedR = processBandPass(renderedR, bandPassRightState, bandPassCenter, bandPassQ, sampleRate);
+        } else if (effectName === "comb") {
+          renderedL = processComb(renderedL, combLeftState, combDelayMs, combFeedback, combMix, sampleRate);
+          renderedR = processComb(renderedR, combRightState, combDelayMs, combFeedback, combMix, sampleRate);
+        } else if (effectName === "flanger") {
+          renderedL = processFlanger(renderedL, flangerLeftState, flangerDelayMs, flangerDepthMs, flangerRateHz, flangerFeedback, sampleRate, flangerMix);
+          renderedR = processFlanger(renderedR, flangerRightState, flangerDelayMs, flangerDepthMs, flangerRateHz, flangerFeedback, sampleRate, flangerMix);
+        } else if (effectName === "chorus") {
+          renderedL = processChorus(renderedL, chorusLeftState, chorusDelayMs, chorusDepthMs, chorusRateHz, chorusMix, sampleRate);
+          renderedR = processChorus(renderedR, chorusRightState, chorusDelayMs, chorusDepthMs, chorusRateHz, chorusMix, sampleRate);
+        } else if (effectName === "delay") {
+          renderedL = processDelay(renderedL, delayLeftState, delayTimeMs, delayFeedback, delayMix, sampleRate);
+          renderedR = processDelay(renderedR, delayRightState, delayTimeMs, delayFeedback, delayMix, sampleRate);
+        } else if (effectName === "resonator" && bank) {
+          const q = curves.resonatorQ?.length ? bankQFromNorm(valueAt(curves.resonatorQ, norm)) : DEFAULT_BANK_Q;
+          const spacing = curves.resonatorSpacing?.length ? valueAt(curves.resonatorSpacing, norm) : 0.5;
+          tuneBandpassBank(bank, resonatorFrequency, q, spacing);
+          if (measuringBank && i < sourceLength) bankInputEnergy += renderedL * renderedL + renderedR * renderedR;
+          renderedL = filterBankChannel(renderedL, bank, "left");
+          renderedR = filterBankChannel(renderedR, bank, "right");
+        } else if (effectName === "resonator") {
+          renderedL = processResonator(renderedL, resonatorLeftState, resonatorFrequency, resonatorDecay, resonatorMix, settings.resonatorPreset);
+          renderedR = processResonatorChannel(renderedR, resonatorRightState, resonatorLeftState);
+        }
+      }
+    }
+    if (measuringBank) {
+      if (i < sourceLength) bankOutputEnergy += renderedL * renderedL + renderedR * renderedR;
+      bankPeak = Math.max(bankPeak, Math.abs(renderedL), Math.abs(renderedR));
+    } else {
+      renderedL = limitSample(renderedL * gain);
+      renderedR = limitSample(renderedR * gain);
+      peak = Math.max(peak, Math.abs(renderedL), Math.abs(renderedR));
+    }
     outL[i] = renderedL;
     outR[i] = renderedR;
-    peak = Math.max(peak, Math.abs(renderedL), Math.abs(renderedR));
 
-    const progress = i / outLength;
+    const progress = frame / totalFrames;
     const now = performance.now();
     if (progress - lastProgress > 0.01 || now - lastYield > 60) {
       lastProgress = progress;

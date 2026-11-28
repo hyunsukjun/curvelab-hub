@@ -1,4 +1,13 @@
 export default {
+  "timbre.bankModeHelp": ["Bandpass Bank", "複数の狭い帯域を並列に通します。Countは帯域数、Layoutは間隔を設定します。"],
+  "timbre.bankSpacingHelp": ["間隔", "中央は選択した配置、上端は各帯域の間隔が10 Hz、下端は元の間隔の2倍です。最初の帯域は基準周波数に固定されます。"],
+  "timbre.bankQHelp": ["Q · Round / Focused / Sharp", "Qを上げると各中心周波数の周りの通過帯域が狭くなります。"],
+  "timbre.resonatorModeHelp": ["Resonator", "Countで共鳴点の数、Layoutでその間隔を設定します。"],
+  "timbre.resonatorFrequencyParamHelp": ["Frequency · Bandpass Bank 20 Hz–6 kHz / Resonator 60 Hz–6 kHz", "全体の基準周波数を移動します。"],
+  "timbre.resonatorDecayParamHelp": ["Decay · 0.03–2 s","各共鳴モードが約60 dB減衰する時間を設定します。入力が続くと音はより長く続くことがあります。"],
+  "timbre.resonatorMixParamHelp": ["Mix · 0–100%", "原音と処理音を混ぜます。100%で処理音のみになります。"],
+  "timbre.resonatorCount": "中心周波数の数を選びます。",
+  "timbre.resonatorPreset": "Spacing の中央では、Harmonic は基準周波数の整数倍、Odd Harmonics は奇数倍、Multiplier は 1・1.5・2・2.5 倍の繰り返しです。",
   "source.source-pen": "元音声の波形では音量ポイント、Labではカーブポイントを編集します。もう一度クリックすると範囲選択に戻ります。",
   "source.source-eraser": "音量ポイントまたはカーブポイントを削除します。音声範囲は保持されます。",
   "source.source-reverse": "現在の音量とフェードを含め、作業用音声全体を逆向きにします。選択範囲やズームで処理範囲は制限されません。取り消しで元に戻せます。",

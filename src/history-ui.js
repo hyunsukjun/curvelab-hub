@@ -1,4 +1,4 @@
-import {tooltipLanguage} from './tooltip-language.js?v=curvelab-source-reverse1';
+import {tooltipLanguage} from './tooltip-language.js?v=hub-bank-first-point1';
 
 export function refreshSavedHistoryTitles(root, view) {
  const stages = new Map(view.history.map(stage => [stage.id, stage]));

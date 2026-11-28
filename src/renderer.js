@@ -1,10 +1,10 @@
-import {needsOfflineConvolution,oscillatorImpulse} from './render-job.js?v=hub-ir-phases1';
+import {needsOfflineConvolution,oscillatorImpulse} from './render-job.js?v=hub-bank-first-point1';
 export function renderJob(lab,packet,spec,onProgress=()=>{}){
  if(lab==='oscillator'&&needsOfflineConvolution(spec))return renderOscillatorIR(spec,onProgress);
  return renderInWorker({lab,packet,spec},packet.channels,onProgress);
 }
 function renderInWorker(message,channels,onProgress){
- const worker=new Worker(new URL('./render-worker.js?v=hub-ir-phases1',import.meta.url),{type:'module'});
+ const worker=new Worker(new URL('./render-worker.js?v=hub-bank-first-point1',import.meta.url),{type:'module'});
  let settled=false,rejectResult;
  const finish=()=>{
   settled=true;

@@ -8,6 +8,8 @@ export const labTooltipCopy = {
   timbre: {
     '#clearCurveButton': clearCurrent,
     '#resetButton': 'Restore all curve defaults, turn off every effect, and clear the effect chain.',
+    '#resonatorCount': 'Choose the number of center frequencies.',
+    '#resonatorPreset': 'Bandpass Bank at center Spacing: Harmonic uses 1, 2, 3…; Odd Harmonics uses 1, 3, 5…; Multiplier repeats 1, 1.5, 2 and 2.5 times Frequency.',
   },
   space: {
     '#clearCurveButton': clearCurrent,

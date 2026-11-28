@@ -24,6 +24,7 @@ export const helpTranslations = {
     ],
     lab: [
       ["Pencil / Eraser", "使用同一工具栏选择当前 Lab 的曲线控制点工具。该操作不会删除音频片段。"],
+      ["第一个点", "上下拖动可移动整条曲线。按住 Mac 的 Command 或 Windows/Linux 的 Ctrl 可只移动第一个点。"],
       ["Shift + 拖动", "垂直移动选中的控制点及其后续各点，保持 X 坐标不变。"],
       ["Option + 单击", "在 Mac 上删除一个曲线控制点。Windows 上使用 Ctrl + 单击。端点受到保护。"],
       ["Escape", "取消正在进行的成组拖动。"],
@@ -67,6 +68,7 @@ export const helpTranslations = {
     ],
     lab: [
       ["Pencil / Eraser", "Cette même barre d’outils permet de choisir l’outil de points du Lab actif. Les zones audio restent intactes."],
+      ["Premier point", "Faites-le glisser verticalement pour déplacer toute la courbe. Maintenez Command sur Mac ou Ctrl sous Windows/Linux pour déplacer uniquement ce point."],
       ["Maj + glissement", "Déplace verticalement le point choisi et les points suivants. Leur position sur l’axe X reste fixe."],
       ["Option + clic", "Supprime un point de courbe sur Mac. Sous Windows, utilisez Ctrl + clic. Les points d’extrémité sont protégés."],
       ["Échap", "Annule le déplacement de groupe en cours."],
@@ -110,6 +112,7 @@ export const helpTranslations = {
     ],
     lab: [
       ["Pencil / Eraser", "Über dieselbe Werkzeugleiste wählen Sie das Punktwerkzeug des aktiven Labs. Audiobereiche bleiben erhalten."],
+      ["Erster Punkt", "Vertikales Ziehen verschiebt die gesamte Kurve. Mit gedrückter Befehlstaste auf dem Mac oder Strg unter Windows/Linux verschieben Sie nur den ersten Punkt."],
       ["Umschalt + Ziehen", "Verschiebt den gewählten Punkt und die nachfolgenden Punkte vertikal. Ihre Position auf der X-Achse bleibt fest."],
       ["Wahltaste + Klick", "Löscht auf dem Mac einen Kurvenpunkt. Unter Windows verwenden Sie Strg + Klick. Endpunkte sind geschützt."],
       ["Esc", "Bricht das laufende Verschieben einer Punktgruppe ab."],
@@ -153,6 +156,7 @@ export const helpTranslations = {
     ],
     lab: [
       ["Pencil / Eraser", "La stessa barra degli strumenti seleziona lo strumento per i punti del Lab attivo. Le regioni audio restano intatte."],
+      ["Primo punto", "Trascina in verticale per spostare tutta la curva. Tieni premuto Comando su Mac o Ctrl su Windows/Linux per spostare solo il primo punto."],
       ["Maiusc + trascinamento", "Sposta verticalmente il punto scelto e quelli successivi. La loro posizione sull’asse X resta fissa."],
       ["Opzione + clic", "Elimina un punto della curva su Mac. Su Windows usa Ctrl + clic. I punti alle estremità sono protetti."],
       ["Esc", "Annulla lo spostamento di gruppo in corso."],
@@ -196,6 +200,7 @@ export const helpTranslations = {
     ],
     lab: [
       ["Pencil / Eraser", "同じツールバーで、現在の Lab のカーブポイント用ツールを選択します。この操作で音声範囲が削除されることはありません。"],
+      ["最初の点", "上下にドラッグするとカーブ全体が移動します。Mac では Command、Windows/Linux では Ctrl を押しながらドラッグすると、最初の点だけが移動します。"],
       ["Shift + ドラッグ", "クリックしたポイントとそれ以降のポイントを上下に移動します。X 座標は固定されます。"],
       ["Option + クリック", "Mac ではカーブポイントを削除します。Windows では Ctrl を押しながらクリックします。端点は削除されません。"],
       ["Escape", "ドラッグ中のポイントの一括移動を取り消します。"],
@@ -239,6 +244,7 @@ export const helpTranslations = {
     ],
     lab: [
       ["Pencil / Eraser", "같은 도구 모음에서 현재 Lab의 커브 점 편집 도구를 선택합니다. 이 도구로 음원 구간은 삭제되지 않습니다."],
+      ["첫 점", "위아래로 끌면 커브 전체가 움직입니다. Mac에서는 ⌘, Windows/Linux에서는 Ctrl을 누르고 끌면 첫 점만 움직입니다."],
       ["Shift + 드래그", "클릭한 점과 그 뒤의 점들을 위아래로 함께 움직입니다. X 좌표는 고정됩니다."],
       ["Option + 클릭", "Mac에서 커브 점을 삭제합니다. Windows에서는 Ctrl을 누른 채 클릭합니다. 양 끝점은 유지됩니다."],
       ["Escape", "진행 중인 여러 점의 드래그를 취소합니다."],
@@ -282,6 +288,7 @@ export const helpTranslations = {
     ],
     lab: [
       ["Pencil / Eraser", "A mesma barra de ferramentas seleciona a ferramenta de pontos do Lab ativo. Nenhum trecho de áudio é apagado."],
+      ["Primeiro ponto", "Arraste na vertical para mover toda a curva. Mantenha Command no Mac ou Ctrl no Windows/Linux pressionado para mover apenas o primeiro ponto."],
       ["Shift + arrastar", "Move na vertical o ponto selecionado e os pontos seguintes, mantendo a posição no eixo X."],
       ["Option + clique", "Exclui um ponto da curva no Mac. No Windows, use Ctrl + clique. Os pontos das extremidades permanecem protegidos."],
       ["Escape", "Cancela o arrasto de um grupo de pontos em curso."],
@@ -325,6 +332,7 @@ export const helpTranslations = {
     ],
     lab: [
       ["Pencil / Eraser", "La misma barra de herramientas selecciona la herramienta de puntos del Lab activo. No se borra ningún tramo de audio."],
+      ["Primer punto", "Arrastra en vertical para mover toda la curva. Mantén pulsada Comando en Mac o Ctrl en Windows/Linux para mover solo el primer punto."],
       ["Shift + arrastrar", "Mueve en vertical el punto seleccionado y los siguientes, manteniendo su posición en el eje X."],
       ["Option + clic", "Elimina un punto de la curva en Mac. En Windows, usa Ctrl + clic. Los puntos de los extremos siguen protegidos."],
       ["Escape", "Cancela el arrastre en curso de un grupo de puntos."],

@@ -1,4 +1,4 @@
-import {helpTranslations} from './help-translations.js?v=curvelab-source-reverse1';
+import {helpTranslations} from './help-translations.js?v=hub-bank-first-point1';
 
 // English leads the menu. The other languages follow their English names.
 const languages = [

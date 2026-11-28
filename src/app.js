@@ -1,8 +1,8 @@
-import {connectHubHelp} from './help-ui.js?v=curvelab-source-reverse1';
-import {createControlHelp} from './control-help.js?v=curvelab-source-reverse1';
-import {tooltipLanguage} from './tooltip-language.js?v=curvelab-source-reverse1';
-import {labTooltipCopy} from './lab-tooltip-copy.js?v=20261108-english-help1';
-import {renderSavedHistory, refreshSavedHistoryTitles} from './history-ui.js?v=curvelab-source-reverse1';
+import {connectHubHelp} from './help-ui.js?v=hub-bank-first-point1';
+import {createControlHelp} from './control-help.js?v=hub-bank-first-point1';
+import {tooltipLanguage} from './tooltip-language.js?v=hub-bank-first-point1';
+import {labTooltipCopy} from './lab-tooltip-copy.js?v=hub-bank-first-point1';
+import {renderSavedHistory, refreshSavedHistoryTitles} from './history-ui.js?v=hub-bank-first-point1';
 import {connectOutputMeter} from './output-meter-ui.js?v=20261107-shared-tools2';
 import {granularSourceMode} from './granular-source.js';
 import {NativeTransport} from './native-transport.js';
@@ -11,8 +11,8 @@ import {findSourceSeek} from '../labs/audio/src/source-seek.js';
 import {HubSession} from './session.js?v=curvelab-committed-output1';
 import {configuredOutputChannels} from './channel-output.js?v=hub-channel-output1';
 import {OUTPUT_GAIN_MIN_DB,OUTPUT_GAIN_MAX_DB,outputGainForPeak,outputGainLinear} from './output-gain.js?v=hub-live-edits1';
-import {renderJob} from './renderer.js?v=hub-ir-phases1';
-import {connectSourceEditor} from './source-ui.js?v=curvelab-source-reverse1';
+import {renderJob} from './renderer.js?v=hub-bank-first-point1';
+import {connectSourceEditor} from './source-ui.js?v=hub-bank-first-point1';
 import {readAudioFile,validateAudioBuffer} from '../labs/audio/src/audio-import.js';
 import {summarizeChannels,peakOf,paintWaveform} from '../labs/audio/src/waveform-view.js';
 import {analyzeSourceColors} from '../labs/audio/src/source-colors.js';
@@ -160,7 +160,10 @@ async function refreshLiveOutput(){
   if(auditionPlan().key===player.output?.key)return;
   const output=await prepareAudition({live:true});
   if(!current()||output.key===player.output?.key)return;
-  const latest=auditionPlan().key;
+  const plan=auditionPlan();
+  // An older Timbre render must not replace playback across a bank gain change.
+  if(active==='timbre' && output.key!==plan.key && output.bankLevelMatching!==plan.bankLevelMatching)return;
+  const latest=plan.key;
   if(latest!==player.output?.key&&(output.key===latest||output.packet.channels[0].length>player.frame)){
    player.replace(output,playbackGain(output),output.key===latest);
   }
@@ -182,7 +185,9 @@ function processingSignature(lab,spec,snapshot){
  if(lab==='timbre'){
   const {settings,curves}=spec;
   const activeCurves=Object.entries(curves).filter(([name])=>settings.chainOrder.some(effect=>name.startsWith(effect)));
-  return signature({settings,curves:activeCurves});
+  // An inactive layout is editor state, not a change to the sound.
+  const {resonatorPreset,resonatorCount,resonatorModel,bankLowHarmonics,bankProfile,bankFrequencyMinHz,bankLevelMatching,...processingSettings}=settings;
+  return signature({settings:settings.resonatorEnabled?settings:{...processingSettings,resonatorPreset:null},curves:activeCurves});
  }
  if(lab==='space'){
   const {direction,distance,format,bypassed,roomSettings}=spec;
@@ -228,8 +233,7 @@ async function getFrame(lab){
   const finish=()=>{if(settled)return;try{const bridge=frame.contentWindow?.hubBridge;if(!bridge)return;const defaults=bridge.defaults();if(lab==='audio')rec.neutralSignature=signature({curves:defaults.curves,settings:defaults.extra.settings});frame.contentDocument.body.dataset.hubLab=lab;controlHelp.connectLab(frame,lab,labTooltipCopy[lab]);watchPlayingEdits(lab,rec);rec.defaults=defaults;settled=true;clearInterval(timer);clearTimeout(timeout);resolve(rec);}catch(error){fail(new Error(title(lab)+' editor could not initialize: '+(error.message||String(error))));}};
   const timer=setInterval(finish,80),timeout=setTimeout(()=>fail(new Error(title(lab)+' editor did not load. Retry or select another Lab.')),45000);frame.onload=finish;
  });records.set(lab,rec);$('frames').append(frame);
- const shellVersion=lab==='space'||lab==='granular'?'hub-channel-output1':'20261108-button-tone-b1';
- frame.src=`labs/${lab}/index.html?hub=1&shell=${shellVersion}`;return rec.promise;
+ frame.src=`labs/${lab}/index.html?hub=1&shell=hub-bank-first-point1`;return rec.promise;
 }
 async function syncEditor(){
  editorLoadController?.abort();
@@ -396,7 +400,8 @@ function auditionPlan(spec=currentSpec()){
  const saved=usesSavedOutput(changed)?session.current:null;
  const direct=!session.reopened&&active==='audio'&&!changed
   &&processing===records.get('audio').neutralSignature&&gainDb===0?session.working.packet:null;
- return {key:(committed?'committed|':saved?'saved|':direct?'direct|':inputOnly?'input|':'rendered|')+processing,direct,saved,gainDb,committed,inputOnly};
+ const bankLevelMatching=active==='timbre'&&!saved&&!inputOnly&&spec.settings.bankLevelMatching===true;
+ return {bankLevelMatching,key:(committed?'committed|':saved?'saved|':direct?'direct|':inputOnly?'input|':'rendered|')+processing,direct,saved,gainDb,committed,inputOnly};
 }
 function matchingOutput(spec){
  if(!auditionCache||auditionCache.bypass&&!auditionCache.inputOnly)return null;
@@ -408,7 +413,7 @@ async function prepareAudition({live=false}={}){
  const blocked=eligibility();
  if(blocked)throw new Error(blocked);
  const working=session.working,lab=active;
- const {key,direct,saved,gainDb,committed,inputOnly}=auditionPlan();
+ const {key,direct,saved,gainDb,committed,inputOnly,bankLevelMatching}=auditionPlan();
  const matches=output=>output?.working===working&&output.lab===lab&&output.key===key;
  if(matches(auditionCache))return auditionCache;
  if(matches(auditionRequest)&&!auditionRequest.controller.signal.aborted){
@@ -441,7 +446,7 @@ async function prepareAudition({live=false}={}){
    }
    controller.signal.throwIfAborted();
    if(!sameInput()||(!request.live&&key!==auditionPlan().key))throw new DOMException('Output changed','AbortError');
-   auditionCache={working,lab,key,...result};
+   auditionCache={working,lab,key,bankLevelMatching,...result};
    if(session.hasLimitError&&key===auditionPlan().key
     &&session.clearResolvedLimitError(lab,currentSpec(),auditionCache))session.emit();
    return auditionCache;

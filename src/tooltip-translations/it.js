@@ -1,4 +1,13 @@
 export default {
+  "timbre.bankModeHelp": ["Bandpass Bank", "Lascia passare più bande strette in parallelo. Count imposta il numero e Layout la spaziatura."],
+  "timbre.bankSpacingHelp": ["Spaziatura", "Al centro si mantiene la disposizione scelta. In alto le bande distano 10 Hz. In basso ogni intervallo originale raddoppia. La prima banda resta alla frequenza di riferimento."],
+  "timbre.bankQHelp": ["Q · Round / Focused / Sharp", "Aumenta Q per restringere ogni banda attorno alla frequenza centrale."],
+  "timbre.resonatorModeHelp": ["Resonator", "Count imposta il numero di risonanze e Layout la loro spaziatura."],
+  "timbre.resonatorFrequencyParamHelp": ["Frequency · Bandpass Bank 20 Hz–6 kHz / Resonator 60 Hz–6 kHz", "Sposta la frequenza di riferimento del gruppo."],
+  "timbre.resonatorDecayParamHelp": ["Decay · 0.03–2 s","Imposta il tempo in cui ciascun modo risonante decade di circa 60 dB. Un ingresso continuo può prolungare il suono."],
+  "timbre.resonatorMixParamHelp": ["Mix · 0–100%", "Miscela il suono originale con quello elaborato. Al 100% si sente solo il suono elaborato."],
+  "timbre.resonatorCount": "Scegli il numero di frequenze centrali.",
+  "timbre.resonatorPreset": "Con Spacing al centro, Harmonic usa tutti i multipli interi e Odd Harmonics solo quelli dispari. Multiplier ripete i rapporti 1, 1,5, 2 e 2,5.",
   "source.source-pen": "Modifica i punti di volume nella forma d’onda sorgente e i punti delle curve nel Lab. Fai di nuovo clic per tornare alla selezione audio.",
   "source.source-eraser": "Rimuovi un punto di volume o della curva. Le regioni audio restano intatte.",
   "source.source-reverse": "Inverte nel tempo tutto l’audio di lavoro, inclusi il volume e le dissolvenze attuali. Selezione e zoom non limitano l’intervallo. Il comando Annulla ripristina l’audio.",

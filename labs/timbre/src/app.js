@@ -1,3 +1,5 @@
+import {eraseModifier, firstPointModifier, eraseAtPoint, verticalTargets} from "../../../src/curve-point-gesture.js";
+import {HARMONIC_BANK_PROFILE, DEFAULT_BANK_Q, bankQToNorm} from "../../../src/timbre-bandpass-bank.js";
 import {shouldPaint} from "../../../src/visual-activity.js";
 import {createSourceLoadGate, fetchDefaultSource} from "./default-source.js?v=20261029-bach1";
 import {beginVerticalGroup, moveVerticalGroup, restoreVerticalGroup, verticalGroupSuffix, drawVerticalGroupRing} from "./curve-group-edit.js?v=20261027-shift1";
@@ -7,6 +9,7 @@ import { summarizeChannels } from "./source-envelope.js";
 import {mountTransport} from "./common-transport.js?v=20261013-1";
 import { readAudioFile, validateAudioBuffer } from "./audio-import.js?v=20261029-input-validation1";
 import { OutputMeterAnalyzer } from "./output-meter.js?v=20260930-02";
+import { BANK_FREQUENCY_MIN_HZ, RESONATOR_FREQUENCY_MIN_HZ, RESONATOR_DEFAULTS, RESONATOR_COUNTS, BANDPASS_BANK_COUNTS, resonatorLayouts, resonatorCountFor, resonatorFrequencyFromNorm, resonatorFrequencyToNorm, resonatorDecayFromNorm, resonatorDecayToNorm, resonatorMixFromNorm } from "../../../src/timbre-resonator.js";
 
 const sourceLoadGate = createSourceLoadGate();
 
@@ -25,9 +28,6 @@ const canvas = document.getElementById("waveCanvas");
 const ctx = canvas.getContext("2d");
 const penTool = document.getElementById("penTool");
 const eraserTool = document.getElementById("eraserTool");
-const eraseModifier = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgentData?.platform || "")
-  ? "altKey"
-  : "ctrlKey";
 const lowpassMode = document.getElementById("lowpassMode");
 const highpassMode = document.getElementById("highpassMode");
 const bandpassMode = document.getElementById("bandpassMode");
@@ -35,6 +35,9 @@ const combMode = document.getElementById("combMode");
 const flangerMode = document.getElementById("flangerMode");
 const chorusMode = document.getElementById("chorusMode");
 const delayMode = document.getElementById("delayMode");
+const bankMode = document.getElementById("bankMode");
+const bankQParam = document.getElementById("bankQParam");
+const resonatorMode = document.getElementById("resonatorMode");
 const parameterBar = document.getElementById("parameterBar");
 const bandpassCenterParam = document.getElementById("bandpassCenterParam");
 const bandpassWidthParam = document.getElementById("bandpassWidthParam");
@@ -53,6 +56,14 @@ const chorusMixParam = document.getElementById("chorusMixParam");
 const delayTimeParam = document.getElementById("delayTimeParam");
 const delayFeedbackParam = document.getElementById("delayFeedbackParam");
 const delayMixParam = document.getElementById("delayMixParam");
+const resonatorFrequencyParam = document.getElementById("resonatorFrequencyParam");
+const resonatorDecayParam = document.getElementById("resonatorDecayParam");
+const bankSpacingParam = document.getElementById("bankSpacingParam");
+const resonatorMixParam = document.getElementById("resonatorMixParam");
+const resonatorCountLabel = document.getElementById("resonatorCountLabel");
+const resonatorCount = document.getElementById("resonatorCount");
+const resonatorLayout = document.getElementById("resonatorLayout");
+const resonatorPreset = document.getElementById("resonatorPreset");
 const parameterLegend = document.getElementById("parameterLegend");
 const cutoffReadout = document.getElementById("cutoffReadout");
 const valueBasisLabel = document.getElementById("valueBasisLabel");
@@ -69,9 +80,17 @@ const meterRows = Array.from(document.querySelectorAll("[data-meter-channel]"));
 const meterClipButton = document.getElementById("meterClipButton");
 
 const transformSettings = {
-  outputGain: 0.95
+  outputGain: 0.95,
+  resonatorModel: "bandpass",
+  bankProfile: HARMONIC_BANK_PROFILE,
+  bankFrequencyMinHz: BANK_FREQUENCY_MIN_HZ,
+  bankLevelMatching: true,
+  bankLowHarmonics: false,
+  resonatorCount: RESONATOR_DEFAULTS.count,
+  resonatorPreset: RESONATOR_DEFAULTS.preset
 };
 
+const usesBandpassBank = () => transformSettings.resonatorModel === "bandpass";
 const largeFileSeconds = 180;
 const sampleNoiseDuration = 8;
 const sampleNoiseBurstSeconds = 0.045833;
@@ -101,7 +120,12 @@ const curveColors = {
   chorusMix: "#6fa8dc",
   delayTime: "#f2b705",
   delayFeedback: "#8fcf7a",
-  delayMix: "#6fa8dc"
+  delayMix: "#6fa8dc",
+  resonatorFrequency: "#67c9dc",
+  resonatorSpacing: "#6fa8dc",
+  resonatorQ: "#f2b705",
+  resonatorDecay: "#f2b705",
+  resonatorMix: "#6fa8dc"
 };
 
 const effects = {
@@ -124,6 +148,9 @@ const effects = {
     enabled: false
   },
   delay: {
+    enabled: false
+  },
+  resonator: {
     enabled: false
   }
 };
@@ -149,6 +176,7 @@ let selectedPoint = null;
 let curvePointerId = null;
 let verticalDrag = null;
 let shiftHeld = false;
+let firstPointOnlyHeld = false;
 let hoveredPoint = null;
 let dragging = false;
 let playheadSeconds = 0;
@@ -223,6 +251,11 @@ const defaultChorusMixY = 0.5;
 const defaultDelayTimeY = 0.157142857143;
 const defaultDelayFeedbackY = 0.529411764706;
 const defaultDelayMixY = 0.4;
+const frequencyMinHz = () => usesBandpassBank() ? BANK_FREQUENCY_MIN_HZ : RESONATOR_FREQUENCY_MIN_HZ;
+const defaultResonatorFrequencyY = () => resonatorFrequencyToNorm(RESONATOR_DEFAULTS.frequencyHz, frequencyMinHz());
+const defaultResonatorDecayY = resonatorDecayToNorm(RESONATOR_DEFAULTS.decaySeconds);
+const qCharacter = y => ["Round", "Soft", "Focused", "Crisp", "Sharp"][Math.round(y * 4)];
+const defaultBankQY = bankQToNorm(DEFAULT_BANK_Q);
 
 const curves = {
   lowpass: [{ x: 0, y: defaultCutoffY }, { x: 1, y: defaultCutoffY }],
@@ -243,7 +276,12 @@ const curves = {
   chorusMix: [{ x: 0, y: defaultChorusMixY }, { x: 1, y: defaultChorusMixY }],
   delayTime: [{ x: 0, y: defaultDelayTimeY }, { x: 1, y: defaultDelayTimeY }],
   delayFeedback: [{ x: 0, y: defaultDelayFeedbackY }, { x: 1, y: defaultDelayFeedbackY }],
-  delayMix: [{ x: 0, y: defaultDelayMixY }, { x: 1, y: defaultDelayMixY }]
+  delayMix: [{ x: 0, y: defaultDelayMixY }, { x: 1, y: defaultDelayMixY }],
+  resonatorFrequency: [{ x: 0, y: defaultResonatorFrequencyY() }, { x: 1, y: defaultResonatorFrequencyY() }],
+  resonatorDecay: [{ x: 0, y: defaultResonatorDecayY }, { x: 1, y: defaultResonatorDecayY }],
+  resonatorSpacing: [{ x: 0, y: 0.5 }, { x: 1, y: 0.5 }],
+  resonatorQ: [{ x: 0, y: defaultBankQY }, { x: 1, y: defaultBankQY }],
+  resonatorMix: [{ x: 0, y: usesBandpassBank() ? 1 : RESONATOR_DEFAULTS.mix }, { x: 1, y: usesBandpassBank() ? 1 : RESONATOR_DEFAULTS.mix }]
 };
 
 const defaultCurves = {
@@ -265,7 +303,12 @@ const defaultCurves = {
   chorusMix: () => [{ x: 0, y: defaultChorusMixY }, { x: 1, y: defaultChorusMixY }],
   delayTime: () => [{ x: 0, y: defaultDelayTimeY }, { x: 1, y: defaultDelayTimeY }],
   delayFeedback: () => [{ x: 0, y: defaultDelayFeedbackY }, { x: 1, y: defaultDelayFeedbackY }],
-  delayMix: () => [{ x: 0, y: defaultDelayMixY }, { x: 1, y: defaultDelayMixY }]
+  delayMix: () => [{ x: 0, y: defaultDelayMixY }, { x: 1, y: defaultDelayMixY }],
+  resonatorFrequency: () => [{ x: 0, y: defaultResonatorFrequencyY() }, { x: 1, y: defaultResonatorFrequencyY() }],
+  resonatorDecay: () => [{ x: 0, y: defaultResonatorDecayY }, { x: 1, y: defaultResonatorDecayY }],
+  resonatorSpacing: () => [{ x: 0, y: 0.5 }, { x: 1, y: 0.5 }],
+  resonatorQ: () => [{ x: 0, y: defaultBankQY }, { x: 1, y: defaultBankQY }],
+  resonatorMix: () => [{ x: 0, y: usesBandpassBank() ? 1 : RESONATOR_DEFAULTS.mix }, { x: 1, y: usesBandpassBank() ? 1 : RESONATOR_DEFAULTS.mix }]
 };
 
 const editedCurves = {
@@ -287,7 +330,12 @@ const editedCurves = {
   chorusMix: false,
   delayTime: false,
   delayFeedback: false,
-  delayMix: false
+  delayMix: false,
+  resonatorFrequency: false,
+  resonatorDecay: false,
+  resonatorSpacing: false,
+  resonatorQ: false,
+  resonatorMix: false
 };
 
 const curveLabels = {
@@ -309,7 +357,12 @@ const curveLabels = {
   chorusMix: "Chorus Mix",
   delayTime: "Delay Time",
   delayFeedback: "Delay Feedback",
-  delayMix: "Delay Mix"
+  delayMix: "Delay Mix",
+  get resonatorFrequency() { return effectLabel("resonator") + " Frequency"; },
+  resonatorDecay: "Resonator Decay",
+  resonatorSpacing: "Bandpass Bank Spacing",
+  resonatorQ: "Bandpass Bank Q",
+  get resonatorMix() { return effectLabel("resonator") + " Mix"; }
 };
 
 const effectLabels = {
@@ -319,7 +372,8 @@ const effectLabels = {
   comb: "Comb",
   flanger: "Flanger",
   chorus: "Chorus",
-  delay: "Delay"
+  delay: "Delay",
+  get resonator() { return usesBandpassBank() ? "Bandpass Bank" : "Resonator"; }
 };
 
 const parameterLegends = {
@@ -355,6 +409,11 @@ const parameterLegends = {
     { color: curveColors.delayTime, text: "delay time 100 ms-1.5 s" },
     { color: curveColors.delayFeedback, text: "feedback 0.00-0.85" },
     { color: curveColors.delayMix, text: "mix 0-100%" }
+  ],
+  resonator: [
+    { color: curveColors.resonatorFrequency, get text() { return `frequency ${frequencyMinHz()} Hz–6 kHz`; } },
+    { color: curveColors.resonatorDecay, get text() { return usesBandpassBank() ? "Q · Round to Sharp" : "decay 0.03-2 s · approximately −60 dB"; } },
+    { color: curveColors.resonatorMix, get text() { return usesBandpassBank() ? "spacing · 10 Hz / layout / double" : "mix 0-100%"; } }
   ]
 };
 
@@ -365,6 +424,7 @@ function effectForCurve(name) {
   if (name === "flangerDelay" || name === "flangerDepth" || name === "flangerRate" || name === "flangerFeedback" || name === "flangerMix") return "flanger";
   if (name === "chorusDelay" || name === "chorusDepth" || name === "chorusRate" || name === "chorusMix") return "chorus";
   if (name === "delayTime" || name === "delayFeedback" || name === "delayMix") return "delay";
+  if (name === "resonatorSpacing" || name === "resonatorQ" || name === "resonatorFrequency" || name === "resonatorDecay" || name === "resonatorMix") return "resonator";
   return name;
 }
 
@@ -373,6 +433,7 @@ function defaultCurveForEffect(name) {
   if (name === "flanger") return "flangerDelay";
   if (name === "chorus") return "chorusDelay";
   if (name === "delay") return "delayTime";
+  if (name === "resonator") return "resonatorFrequency";
   return name === "bandpass" ? "bandpassCenter" : name;
 }
 
@@ -390,6 +451,7 @@ function curveNamesForEffect(name) {
   if (name === "flanger") return ["flangerDelay", "flangerDepth", "flangerRate", "flangerFeedback", "flangerMix"];
   if (name === "chorus") return ["chorusDelay", "chorusDepth", "chorusRate", "chorusMix"];
   if (name === "delay") return ["delayTime", "delayFeedback", "delayMix"];
+  if (name === "resonator") return ["resonatorFrequency", ...(usesBandpassBank() ? ["resonatorQ", "resonatorSpacing"] : ["resonatorDecay", "resonatorMix"])];
   return [name];
 }
 
@@ -727,6 +789,25 @@ function formatTimeEffectValue(name, y) {
   return "";
 }
 
+function formatResonatorValue(name, y) {
+  if (name === "resonatorFrequency") return formatCutoff(resonatorFrequencyFromNorm(y, frequencyMinHz()));
+  if (name === "resonatorQ") return qCharacter(y);
+  if (name === "resonatorSpacing") {
+    if (y === 1) return "10 Hz";
+    if (y === 0.5) return "Layout";
+    if (y < 0.5) return `${(2 - 2 * y).toFixed(2)}× layout`;
+    return `${Math.round(100 * (2 * y - 1))}% toward 10 Hz`;
+  }
+  if (name === "resonatorDecay") return `${resonatorDecayFromNorm(y).toFixed(2)} s`;
+  if (name === "resonatorMix") return `${Math.round(resonatorMixFromNorm(y) * 100)}%`;
+  return "";
+}
+
+function formatCurrentResonatorValue(name) {
+  const norm = buffer?.duration ? Math.max(0, Math.min(1, playheadSeconds / buffer.duration)) : 0;
+  return formatResonatorValue(name, valueAt(curves[name], norm));
+}
+
 function formatCurrentCombValue(name) {
   const norm = buffer?.duration ? Math.max(0, Math.min(1, playheadSeconds / buffer.duration)) : 0;
   const curveValue = valueAt(curves[name], norm);
@@ -820,7 +901,10 @@ function sendCurves() {
     chorusMixCurve: curves.chorusMix,
     delayTimeCurve: curves.delayTime,
     delayFeedbackCurve: curves.delayFeedback,
-    delayMixCurve: curves.delayMix
+    delayMixCurve: curves.delayMix,
+    resonatorFrequencyCurve: curves.resonatorFrequency,
+    resonatorDecayCurve: curves.resonatorDecay,
+    resonatorMixCurve: curves.resonatorMix
   });
 }
 
@@ -919,6 +1003,8 @@ function toggleAudio() {
 function getSettings() {
   return {
     ...transformSettings,
+    bankLevelMatching: transformSettings.bankLevelMatching && usesBandpassBank() &&
+      effects.resonator.enabled && effectForCurve(activeCurve) === "resonator",
     lowPassEnabled: effects.lowpass.enabled,
     highPassEnabled: effects.highpass.enabled,
     bandPassEnabled: effects.bandpass.enabled,
@@ -926,13 +1012,16 @@ function getSettings() {
     flangerEnabled: effects.flanger.enabled,
     chorusEnabled: effects.chorus.enabled,
     delayEnabled: effects.delay.enabled,
+    resonatorEnabled: effects.resonator.enabled,
+    resonatorCount: transformSettings.resonatorCount,
+    resonatorPreset: transformSettings.resonatorPreset,
     chainOrder: activeChainOrder()
   };
 }
 
 async function getOfflineRenderer() {
   if (!renderOffline) {
-    const module = await import("./offline-render.js?v=20261025-fade10");
+    const module = await import("./offline-render.js?v=hub-bank-first-point1");
     renderOffline = module.renderOffline;
   }
   return renderOffline;
@@ -1044,6 +1133,7 @@ function drawPointLabel(name, point, color) {
   const valueLabel = name === "bandpassWidth"
     ? formatWidth(point.y)
     : (effectForCurve(name) === "comb" ? formatCombValue(name, point.y) : (
+      effectForCurve(name) === "resonator" ? formatResonatorValue(name, point.y) :
       ["flanger", "chorus", "delay"].includes(effectForCurve(name))
         ? formatTimeEffectValue(name, point.y)
         : formatCutoff(cutoffFromNorm(point.y))
@@ -1185,7 +1275,15 @@ function drawWidthAxis() {
 function drawValueAxis() {
   const h = canvasCssHeight;
   let labels;
-  if (activeCurve === "combDelay" || activeCurve === "flangerDelay") {
+  if (activeCurve === "resonatorFrequency") {
+    labels = (usesBandpassBank() ? [6000, 1000, 300, 100, 50, 20] : [6000, 3000, 1000, 300, 60]).map(hz => ({ value: resonatorFrequencyToNorm(hz, frequencyMinHz()), text: formatCutoff(hz) }));
+  } else if (activeCurve === "resonatorQ") {
+    labels = [1, 0.5, 0].map(value => ({value, text: qCharacter(value)}));
+  } else if (activeCurve === "resonatorSpacing") {
+    labels = [{value: 1, text: "10 Hz"}, {value: 0.5, text: "Layout"}, {value: 0, text: "2×"}];
+  } else if (activeCurve === "resonatorDecay") {
+    labels = [2, 1, 0.3, 0.1, 0.03].map(seconds => ({ value: resonatorDecayToNorm(seconds), text: `${seconds} s` }));
+  } else if (activeCurve === "combDelay" || activeCurve === "flangerDelay") {
     labels = [
       { value: activeCurve === "combDelay" ? normFromCombDelayMs(100) : normFromFlangerDelayMs(10), text: activeCurve === "combDelay" ? "100 ms" : "10 ms" },
       { value: activeCurve === "combDelay" ? normFromCombDelayMs(30) : normFromFlangerDelayMs(5), text: activeCurve === "combDelay" ? "30 ms" : "5 ms" },
@@ -1300,7 +1398,7 @@ function drawCurves() {
     drawCurve(activeCurve, curves[activeCurve], curveColors[activeCurve], 4.8, true);
     return;
   }
-  if (["flanger", "chorus", "delay"].includes(effectForCurve(activeCurve))) {
+  if (["flanger", "chorus", "delay", "resonator"].includes(effectForCurve(activeCurve))) {
     const activeEffect = effectForCurve(activeCurve);
     for (const name of curveNamesForEffect(activeEffect)) {
       if (name !== activeCurve) drawCurve(name, curves[name], curveColors[name], 2.1, false);
@@ -1441,7 +1539,7 @@ function draw() {
   ctx.fillRect(0, 0, w, h);
 
   const plotW = Math.max(1, w - axisWidth);
-  const frequencyAxis = activeCurve !== "bandpassWidth" && !["comb", "flanger", "chorus", "delay"].includes(effectForCurve(activeCurve));
+  const frequencyAxis = activeCurve !== "bandpassWidth" && !["comb", "flanger", "chorus", "delay", "resonator"].includes(effectForCurve(activeCurve));
   // Quiet background grid; retain scales, points and curve contrast.
   ctx.save();
   ctx.globalAlpha *= 0.65;
@@ -1450,13 +1548,13 @@ function draw() {
 
   const activeEffect = effectForCurve(activeCurve);
   if (activeCurve === "bandpassWidth") drawWidthAxis();
-  else if (["comb", "flanger", "chorus", "delay"].includes(activeEffect)) drawValueAxis();
+  else if (["comb", "flanger", "chorus", "delay", "resonator"].includes(activeEffect)) drawValueAxis();
   else drawLowPassAxis();
 
   if (activeEffect && effects[activeEffect].enabled) {
     if (activeEffect === "bandpass") {
       drawBandPassFill();
-    } else if (!["comb", "flanger", "chorus", "delay"].includes(activeEffect)) {
+    } else if (!["comb", "flanger", "chorus", "delay", "resonator"].includes(activeEffect)) {
       drawFilterFill(activeCurve, curves[activeCurve], curveColors[activeCurve]);
     }
     drawCurves();
@@ -1482,7 +1580,8 @@ function draw() {
     ? (
       activeEffect === "comb"
         ? formatCurrentCombValue(activeCurve)
-        : (["flanger", "chorus", "delay"].includes(activeEffect)
+        : (activeEffect === "resonator" ? formatCurrentResonatorValue(activeCurve) :
+          ["flanger", "chorus", "delay"].includes(activeEffect)
           ? formatCurrentTimeEffectValue(activeCurve)
         : formatCurrentFilterValue(activeCurve)
         )
@@ -1845,6 +1944,10 @@ resetButton.addEventListener("click", () => {
   if (!shouldReset) return;
 
   forceStopAudio();
+  transformSettings.bankLevelMatching = true;
+  transformSettings.resonatorModel = "bandpass";
+  transformSettings.bankProfile = HARMONIC_BANK_PROFILE;
+  transformSettings.bankLowHarmonics = false;
   for (const name of Object.keys(curves)) {
     curves[name] = defaultCurves[name]();
     editedCurves[name] = false;
@@ -1856,6 +1959,10 @@ resetButton.addEventListener("click", () => {
   effects.flanger.enabled = false;
   effects.chorus.enabled = false;
   effects.delay.enabled = false;
+  effects.resonator.enabled = false;
+  transformSettings.resonatorPreset = RESONATOR_DEFAULTS.preset;
+  transformSettings.resonatorCount = RESONATOR_DEFAULTS.count;
+  syncResonatorControls();
   chainOrder = [];
   activeCurve = null;
   selectedPoint = null;
@@ -1881,6 +1988,7 @@ clearCurveButton.addEventListener("click", () => {
 });
 
 function setActiveCurve(name) {
+  if (!hubQuiet && usesBandpassBank() && effectForCurve(name) === "resonator") transformSettings.bankLevelMatching = true;
   if (verticalDrag) finishCurveDrag(true);
   activeCurve = name;
   updateEffectButtons();
@@ -1931,13 +2039,23 @@ function updateEffectButtons() {
   delayMode.setAttribute("aria-pressed", String(effects.delay.enabled));
   delayMode.dataset.helpState = effects.delay.enabled ? "Delay is active" : "Delay is bypassed";
 
+  const modeButton = usesBandpassBank() ? bankMode : resonatorMode;
+  bankMode.hidden = !usesBandpassBank();
+  resonatorMode.hidden = usesBandpassBank();
+  modeButton.classList.toggle("enabled", effects.resonator.enabled);
+  modeButton.classList.toggle("bypassed", !effects.resonator.enabled);
+  modeButton.classList.toggle("active", activeEffect === "resonator");
+  modeButton.setAttribute("aria-pressed", String(effects.resonator.enabled));
+  modeButton.dataset.helpState = effectLabel("resonator") + (effects.resonator.enabled ? " is active" : " is bypassed");
+
   const showsBandParams = activeEffect === "bandpass";
   const showsCombParams = activeEffect === "comb";
   const showsFlangerParams = activeEffect === "flanger";
   const showsChorusParams = activeEffect === "chorus";
   const showsDelayParams = activeEffect === "delay";
+  const showsResonatorParams = activeEffect === "resonator";
   clearCurveButton.disabled = !activeCurve;
-  parameterBar.hidden = !showsBandParams && !showsCombParams && !showsFlangerParams && !showsChorusParams && !showsDelayParams;
+  parameterBar.hidden = !showsBandParams && !showsCombParams && !showsFlangerParams && !showsChorusParams && !showsDelayParams && !showsResonatorParams;
   bandpassCenterParam.hidden = !showsBandParams;
   bandpassWidthParam.hidden = !showsBandParams;
   combDelayParam.hidden = !showsCombParams;
@@ -1955,6 +2073,13 @@ function updateEffectButtons() {
   delayTimeParam.hidden = !showsDelayParams;
   delayFeedbackParam.hidden = !showsDelayParams;
   delayMixParam.hidden = !showsDelayParams;
+  resonatorFrequencyParam.hidden = !showsResonatorParams;
+  bankQParam.hidden = !showsResonatorParams || !usesBandpassBank();
+  resonatorDecayParam.hidden = !showsResonatorParams || usesBandpassBank();
+  bankSpacingParam.hidden = !showsResonatorParams || !usesBandpassBank();
+  resonatorMixParam.hidden = !showsResonatorParams || usesBandpassBank();
+  resonatorCountLabel.hidden = !showsResonatorParams;
+  resonatorLayout.hidden = !showsResonatorParams;
   bandpassCenterParam.classList.toggle("active", activeCurve === "bandpassCenter");
   bandpassWidthParam.classList.toggle("active", activeCurve === "bandpassWidth");
   combDelayParam.classList.toggle("active", activeCurve === "combDelay");
@@ -1972,6 +2097,14 @@ function updateEffectButtons() {
   delayTimeParam.classList.toggle("active", activeCurve === "delayTime");
   delayFeedbackParam.classList.toggle("active", activeCurve === "delayFeedback");
   delayMixParam.classList.toggle("active", activeCurve === "delayMix");
+  resonatorFrequencyParam.classList.toggle("active", activeCurve === "resonatorFrequency");
+  bankQParam.classList.toggle("active", activeCurve === "resonatorQ");
+  resonatorDecayParam.classList.toggle("active", activeCurve === "resonatorDecay");
+  bankSpacingParam.classList.toggle("active", activeCurve === "resonatorSpacing");
+  resonatorMixParam.classList.toggle("active", activeCurve === "resonatorMix");
+  for (const control of [resonatorFrequencyParam, resonatorDecayParam, bankQParam, bankSpacingParam, resonatorMixParam]) {
+    control.setAttribute("aria-pressed", String(control.classList.contains("active")));
+  }
   renderParameterLegend();
   renderChainDiagram();
 }
@@ -1991,6 +2124,7 @@ function toggleEffect(name) {
 }
 
 function handleEffectClick(name) {
+  if (name === "resonator" && usesBandpassBank()) transformSettings.bankLevelMatching = true;
   if (verticalDrag) finishCurveDrag(true);
   const currentEffect = effectForCurve(activeCurve);
   if (currentEffect === name) {
@@ -2035,6 +2169,42 @@ chorusMode.addEventListener("click", () => {
 
 delayMode.addEventListener("click", () => {
   handleEffectClick("delay");
+});
+
+bankMode.addEventListener("click", () => handleEffectClick("resonator"));
+bankSpacingParam.addEventListener("click", () => setActiveCurve("resonatorSpacing"));
+bankQParam.addEventListener("click", () => setActiveCurve("resonatorQ"));
+resonatorMode.addEventListener("click", () => handleEffectClick("resonator"));
+resonatorFrequencyParam.addEventListener("click", () => setActiveCurve("resonatorFrequency"));
+resonatorDecayParam.addEventListener("click", () => setActiveCurve("resonatorDecay"));
+resonatorMixParam.addEventListener("click", () => setActiveCurve("resonatorMix"));
+function syncResonatorControls() {
+  const {resonatorCount: count} = transformSettings;
+  const counts = usesBandpassBank() ? BANDPASS_BANK_COUNTS : RESONATOR_COUNTS;
+  const options = counts.map(n => new Option(String(n), String(n)));
+  if (count === 3) options.unshift(new Option("3 (legacy)", "3"));
+  resonatorCount.replaceChildren(...options);
+  resonatorCount.value = String(count);
+  const layouts = resonatorLayouts(count, usesBandpassBank(), transformSettings.resonatorPreset);
+  if (!Object.hasOwn(layouts, transformSettings.resonatorPreset)) {
+    transformSettings.resonatorPreset = RESONATOR_DEFAULTS.preset;
+  }
+  resonatorPreset.replaceChildren(...Object.entries(layouts).map(([value, layout]) => new Option(layout.label, value)));
+  resonatorPreset.value = transformSettings.resonatorPreset;
+}
+resonatorCount.addEventListener("change", () => {
+  if (verticalDrag) finishCurveDrag(true);
+  transformSettings.resonatorCount = Number(resonatorCount.value);
+  syncResonatorControls();
+  sendSettings();
+  draw();
+});
+resonatorPreset.addEventListener("change", () => {
+  if (verticalDrag) finishCurveDrag(true);
+  transformSettings.resonatorPreset = resonatorPreset.value;
+  syncResonatorControls();
+  sendSettings();
+  draw();
 });
 
 bandpassCenterParam.addEventListener("click", () => {
@@ -2137,24 +2307,32 @@ function findPointNearScreen(screenPosition, curve, name = activeCurve) {
   ));
 }
 
-function isErasing(event) {
-  return selectedTool === "eraser" || Boolean(event?.[eraseModifier]);
+function hoveredIndex() {
+  return hoveredPoint;
+}
+
+function isErasing(event, index) {
+  return eraseAtPoint(selectedTool, Boolean(event?.[eraseModifier]), index);
 }
 
 function updateEraseCursor(event) {
-  if (event) shiftHeld = Boolean(event.shiftKey);
+  if (event) {
+    shiftHeld = Boolean(event.shiftKey);
+    firstPointOnlyHeld = Boolean(event[firstPointModifier]);
+  }
   const editable = Boolean(activeCurve && effects[effectForCurve(activeCurve)].enabled);
-  const erasing = editable && curvePointerId == null && isErasing(event);
+  const erasing = editable && curvePointerId == null && isErasing(event, hoveredIndex());
   canvas.classList.toggle("eraseMode", erasing);
-  canvas.style.cursor = !editable ? "default" : verticalDrag || (curvePointerId == null && shiftHeld && !erasing)
+  canvas.style.cursor = !editable ? "default" : verticalDrag || (curvePointerId == null && (shiftHeld || hoveredIndex() === 0) && !erasing)
     ? "ns-resize" : erasing ? "" : hoveredPoint != null ? "pointer" : "crosshair";
 }
 
 function getVerticalPoints() {
   if (verticalDrag) return verticalDrag.points.map(entry => entry.point);
-  if (curvePointerId != null || !shiftHeld || canvas.classList.contains("eraseMode") || !(Boolean(activeCurve && effects[effectForCurve(activeCurve)].enabled))) return [];
-  const index = hoveredPoint;
-  return index != null && index >= 0 ? curves[activeCurve].slice(index) : [];
+  if (curvePointerId != null || canvas.classList.contains("eraseMode") || !(Boolean(activeCurve && effects[effectForCurve(activeCurve)].enabled))) return [];
+  const index = hoveredIndex();
+  if (index == null || index < 0 || (!shiftHeld && index !== 0)) return [];
+  return verticalTargets(curves[activeCurve], index, firstPointOnlyHeld && !shiftHeld);
 }
 
 function groupPointerY(event, anchorX) {
@@ -2171,7 +2349,8 @@ function beginCurveGroup(event, index) {
   event.preventDefault();
   if (index == null || index < 0) return false;
   const anchorX = curves[activeCurve][index].x;
-  const group = beginVerticalGroup(curves[activeCurve], index, groupPointerY(event, anchorX));
+  const targets = verticalTargets(curves[activeCurve], index, event[firstPointModifier] && !event.shiftKey);
+  const group = beginVerticalGroup(targets, 0, groupPointerY(event, anchorX));
   group.curveName = activeCurve;
   group.anchorX = anchorX;
   group.wasEdited = editedCurves[activeCurve];
@@ -2235,7 +2414,7 @@ canvas.addEventListener("pointerdown", (event) => {
   const p = pointerToPoint(event);
   const curve = curves[activeCurve];
   selectedPoint = findPointNearScreen(pointerToScreenPosition(event), curve);
-  if (isErasing(event)) {
+  if (isErasing(event, selectedPoint)) {
     event.preventDefault();
     if (selectedPoint > 0 && selectedPoint < curve.length - 1) {
       curve.splice(selectedPoint, 1);
@@ -2247,7 +2426,7 @@ canvas.addEventListener("pointerdown", (event) => {
     }
     return;
   }
-  if (event.shiftKey) {
+  if (event.shiftKey || selectedPoint === 0) {
     hoveredPoint = selectedPoint >= 0 ? selectedPoint : null;
     beginCurveGroup(event, selectedPoint);
     if (selectedPoint < 0) selectedPoint = null;
@@ -2287,6 +2466,7 @@ canvas.addEventListener("pointermove", (event) => {
     const nextHoveredPoint = findPointNearScreen(pointerToScreenPosition(event), curve);
     if (nextHoveredPoint !== hoveredPoint) {
       hoveredPoint = nextHoveredPoint;
+      updateEraseCursor(event);
       draw();
     }
     return;
@@ -2330,20 +2510,23 @@ window.addEventListener("keydown", (event) => {
     draw();
     return;
   }
+  const previousFirstOnly = firstPointOnlyHeld;
   const previousShift = shiftHeld;
   const previousErase = canvas.classList.contains("eraseMode");
   updateEraseCursor(event);
-  if (previousShift !== shiftHeld || previousErase !== canvas.classList.contains("eraseMode")) draw();
+  if (previousFirstOnly !== firstPointOnlyHeld || previousShift !== shiftHeld || previousErase !== canvas.classList.contains("eraseMode")) draw();
 });
 window.addEventListener("keyup", (event) => {
+  const previousFirstOnly = firstPointOnlyHeld;
   const previousShift = shiftHeld;
   const previousErase = canvas.classList.contains("eraseMode");
   updateEraseCursor(event);
-  if (previousShift !== shiftHeld || previousErase !== canvas.classList.contains("eraseMode")) draw();
+  if (previousFirstOnly !== firstPointOnlyHeld || previousShift !== shiftHeld || previousErase !== canvas.classList.contains("eraseMode")) draw();
 });
 window.addEventListener("blur", () => {
   finishCurveDrag(true);
   shiftHeld = false;
+  firstPointOnlyHeld = false;
   hoveredPoint = null;
   updateEraseCursor();
   draw();
@@ -2416,7 +2599,51 @@ sourceLoadGate.begin();
 let hubQuiet=0;
 const hubDOM=()=>Object.fromEntries([...document.querySelectorAll('input[id],select[id]')].filter(e=>e.type!=='file'&&!/scrub|seek|meter/i.test(e.id)).map(e=>[e.id,{value:e.value,checked:e.checked}]));
 function hubSnapshot(){return {curves:structuredClone(curves),edited:structuredClone(editedCurves),activeCurve,tool:selectedTool,dom:hubDOM(),extra:structuredClone(({settings:{...transformSettings},effects:structuredClone(effects),chainOrder:[...chainOrder]}))};}
-function hubRestore(s){if(!s)return;hubQuiet++;try{for(const [id,v]of Object.entries(s.dom||{})){const e=document.getElementById(id);if(e){e.value=v.value;e.checked=v.checked;}}Object.assign(transformSettings,s.extra.settings); Object.assign(effects,structuredClone(s.extra.effects)); chainOrder=[...s.extra.chainOrder]; updateEffectButtons(); renderChainDiagram();for(const [k,v]of Object.entries(s.curves))curves[k]=structuredClone(v);Object.assign(editedCurves,s.edited||{});setTool(s.tool||'pen');setActiveCurve(s.activeCurve);resizeCanvas();draw();}finally{hubQuiet--;}}
+function hubRestore(s) {
+  if (!s) return;
+  hubQuiet++;
+  try {
+    for (const [id, value] of Object.entries(s.dom || {})) {
+      const element = document.getElementById(id);
+      if (element) { element.value = value.value; element.checked = value.checked; }
+    }
+    Object.assign(transformSettings, {outputGain: 0.95, resonatorPreset: RESONATOR_DEFAULTS.preset}, s.extra?.settings || {});
+    const saved = s.extra?.settings;
+    transformSettings.bankLevelMatching = saved?.bankLevelMatching ?? !saved?.resonatorModel;
+    // Pre-bank Resonator recipes kept the three-mode or extended modal processor.
+    transformSettings.resonatorModel = saved?.resonatorModel ?? (saved?.resonatorPreset != null ? "modal" : "bandpass");
+    // Existing Bandpass Bank stages retain the weighting used to render their WAV.
+    transformSettings.bankProfile = saved?.resonatorModel
+      ? saved.bankProfile ?? null : HARMONIC_BANK_PROFILE;
+    transformSettings.bankLowHarmonics = saved?.bankLowHarmonics ?? false;
+    transformSettings.resonatorCount = resonatorCountFor(saved);
+    syncResonatorControls();
+    // Older stages have no Resonator fields; never inherit them from another stage.
+    for (const name of Object.keys(effects)) effects[name].enabled = Boolean(s.extra?.effects?.[name]?.enabled);
+    chainOrder = [...new Set(s.extra?.chainOrder || [])].filter(name => effects[name]?.enabled);
+    for (const name of Object.keys(curves)) {
+      curves[name] = structuredClone(s.curves?.[name] || defaultCurves[name]());
+      editedCurves[name] = Boolean(s.edited?.[name]);
+    }
+    transformSettings.bankFrequencyMinHz = BANK_FREQUENCY_MIN_HZ;
+    if (usesBandpassBank()) {
+      if (saved?.bankFrequencyMinHz !== BANK_FREQUENCY_MIN_HZ && s.curves?.resonatorFrequency?.length) {
+        for (const point of curves.resonatorFrequency) {
+          point.y = resonatorFrequencyToNorm(resonatorFrequencyFromNorm(point.y), BANK_FREQUENCY_MIN_HZ);
+        }
+      }
+      curves.resonatorMix = defaultCurves.resonatorMix();
+      editedCurves.resonatorMix = false;
+    }
+    selectedPoint = hoveredPoint = null;
+    setTool(s.tool || 'pen');
+    const restoredCurve = usesBandpassBank() && s.activeCurve === "resonatorMix" ? "resonatorSpacing" : s.activeCurve;
+    setActiveCurve(Object.hasOwn(curves, restoredCurve) ? restoredCurve : null);
+    resizeCanvas();
+    draw();
+  } finally { hubQuiet--; }
+}
+syncResonatorControls();
 const hubDefault=hubSnapshot();
 window.hubBridge={
  displayTime:seconds=>{playheadSeconds=Math.min(seconds,buffer?.duration||0);draw();},
