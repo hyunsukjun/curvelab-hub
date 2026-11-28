@@ -1,3 +1,4 @@
+import {MAX_VOICES} from './voice-counts.js';
 import {irSourceReleaseGain} from "./ir-source-boundary.js?v=20261030-ir-end1";
 import { fadeOutput } from "./playback-boundary.js";
 import { renderFrame, createSmoothingState, TARGET_SAMPLE_RATE, MAX_SOUND_DURATION_SECONDS, clamp, edgeFade, encodeWav24Steps, outputChannelCount } from "./oscillator-core.js?v=20261026-harmonic-pan8";
@@ -35,8 +36,8 @@ export async function renderOscillator({ settings, impulse, signal, onProgress, 
   const frameCount = Math.ceil(duration * sampleRate);
   const channelCount = outputChannelCount(settings.format);
   let output = Array.from({ length: channelCount }, () => new Float32Array(frameCount));
-  const phases = new Float64Array(64);
-  const modPhases = new Float64Array(64);
+  const phases = new Float64Array(MAX_VOICES);
+  const modPhases = new Float64Array(MAX_VOICES);
   const smoothingState = createSmoothingState();
   const convolving = Boolean(impulse && settings.convolutionEnabled && settings.convolutionWet > 0);
   let peak = 0;

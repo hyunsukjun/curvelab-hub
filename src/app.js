@@ -200,6 +200,9 @@ function processingSignature(lab,spec,snapshot){
  if(settings.soundMode==='resynthesis'){
   const {basePitch,...otherCurves}=curves;
   return signature({mode:settings.soundMode,duration:settings.durationSeconds,
+   waveform:settings.waveform,layout:settings.sourceLayout,modulation:settings.modulationMode,
+   ratios:settings.sourceLayout==='multiplier'?settings.multiplierText:null,
+   modRatio:settings.modulationMode==='off'?null:settings.modulationRatio,
    partials:snapshot.dom.partialCountSelect.value,curves:otherCurves,
    basePitch:snapshot.extra.editedCurves.basePitch?basePitch:null});
  }

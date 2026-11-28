@@ -1,6 +1,6 @@
 import {needsOfflineConvolution,oscillatorImpulse} from './render-job.js?v=hub-bank-first-point1';
 export function renderJob(lab,packet,spec,onProgress=()=>{}){
- if(lab==='oscillator'&&needsOfflineConvolution(spec))return renderOscillatorIR(spec,onProgress);
+ if(lab==='oscillator'&&needsOfflineConvolution(spec))return renderOscillatorIR(packet,spec,onProgress);
  return renderInWorker({lab,packet,spec},packet.channels,onProgress);
 }
 function renderInWorker(message,channels,onProgress){
@@ -33,14 +33,14 @@ function renderInWorker(message,channels,onProgress){
   rejectResult(new DOMException('Cancelled','AbortError'));
  }};
 }
-function renderOscillatorIR(spec,onProgress){
+function renderOscillatorIR(packet,spec,onProgress){
  const controller=new AbortController(),{signal}=controller;
  const {settings,impulse:ir,hubLevelPolicy,hubOutputGain}=spec;
  const {convolutionWet}=settings;
  let phase;
  const promise=(async()=>{
   // Only the native convolution graph needs the main thread's Web Audio APIs.
-  phase=renderInWorker({phase:'ir-source',settings,impulseLength:ir.channels[0].length},[],onProgress);
+  phase=renderInWorker({phase:'ir-source',packet,settings,impulseLength:ir.channels[0].length},packet.channels,onProgress);
   const source=await phase.promise;
   signal.throwIfAborted();
   const {renderConvolved}=await import('../labs/oscillator/src/convolution.js?v=20261006-cancel-drain1');

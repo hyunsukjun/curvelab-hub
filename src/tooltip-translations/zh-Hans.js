@@ -23,7 +23,7 @@ export default {
   "tab.space": "在空间中移动声音，并调整距离和混响。",
   "tab.granular": "用源音频中的短颗粒构建声音。",
   "tab.spectral": "变换源音频的频谱成分。",
-  "tab.oscillator": "对音频文件进行重合成，或生成振荡器声音。可以选用文件作为脉冲响应。",
+  "tab.oscillator": "根据分音随时间的变化重新合成当前音频。",
   "tab.handoff": "处理设置有更改时，切换 Lab 会保存一个新阶段。",
   "lab.clearCurrent": "将选中的曲线恢复为默认值。",
   "audio.resetButton": "将速度、音高和声像曲线恢复为默认值。",
@@ -207,7 +207,7 @@ export default {
   "oscillator.stackSelect": "选择振荡器频率相对于基频的排列方式。",
   "oscillator.modulationSelect": "选择 FM、AM 或环形调制，或关闭调制。",
   "oscillator.modulationRatioInput": "以各振荡器频率的倍数设置调制器频率。",
-  "oscillator.partialCountSelect": "将重合成使用的分音数量上限设为 32 或 64。",
+  "oscillator.partialCountSelect": "将重合成使用的分音数量上限设为 16、32、64 或 128。",
   "oscillator.convolutionWet": "混合振荡器原声与脉冲响应处理后的声音。",
   "oscillator.impulseLength": "设置要使用的脉冲响应长度。短于 3 秒的文件会完整使用。",
   "oscillator.basePitchModeHelp": [

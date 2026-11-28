@@ -23,7 +23,7 @@ export default {
   "tab.space": "空間内で音を動かし、距離とリバーブを調整します。",
   "tab.granular": "元音声の短いグレインを組み合わせて音を作ります。",
   "tab.spectral": "元音声の周波数成分を変形します。",
-  "tab.oscillator": "ファイルを再合成するか、オシレーターで音を作ります。インパルス応答ファイルも使用できます。",
+  "tab.oscillator": "時間とともに変化する部分音を使って、作業中の音声を再合成します。",
   "tab.handoff": "処理設定を変更した場合は、Lab の切り替え時に新しいステージが保存されます。",
   "lab.clearCurrent": "選択中のカーブを既定値に戻します。",
   "audio.resetButton": "速度・ピッチ・パンのカーブを既定値に戻します。",
@@ -207,7 +207,7 @@ export default {
   "oscillator.stackSelect": "基準周波数に対するオシレーター周波数の配置を選びます。",
   "oscillator.modulationSelect": "FM、AM、リング変調、またはオフを選びます。",
   "oscillator.modulationRatioInput": "各オシレーター周波数に対する変調器の周波数比を設定します。",
-  "oscillator.partialCountSelect": "再合成に使用する部分音の上限を 32 または 64 から選びます。",
+  "oscillator.partialCountSelect": "再合成に使用する部分音の上限を 16・32・64・128 から選びます。",
   "oscillator.convolutionWet": "オシレーターの原音とインパルス応答で処理した音を混ぜます。",
   "oscillator.impulseLength": "使用するインパルス応答の長さを設定します。3秒未満のファイルは全体を使います。",
   "oscillator.basePitchModeHelp": [

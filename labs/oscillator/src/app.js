@@ -17,6 +17,7 @@ import {
   effectiveBaseFrequency,
   modulatedOscillatorSample,
   modulationAmountAt,
+  parseMultipliers,
   partialDeviationFromNorm,
   resynthesisVoices,
   softLimit,
@@ -70,6 +71,15 @@ const resynthesisModeButton = document.getElementById("resynthesisMode");
 const oscillatorControls = document.getElementById("oscillatorControls");
 const resynthesisControls = document.getElementById("resynthesisControls");
 const resynthesisSource = document.getElementById("resynthesisSource");
+const trackedWaveform = document.getElementById("trackedWaveform");
+const trackedLayout = document.getElementById("trackedLayout");
+const trackedMultipliers = document.getElementById("trackedMultipliers");
+const trackedModulation = document.getElementById("trackedModulation");
+const trackedRatio = document.getElementById("trackedRatio");
+
+function currentModulation() {
+  return (soundMode === "resynthesis" ? trackedModulation : modulationSelect).value;
+}
 const partialCountSelect = document.getElementById("partialCountSelect");
 const analysisStatus = document.getElementById("analysisStatus");
 const convolutionControls = document.getElementById("convolutionControls");
@@ -258,12 +268,13 @@ function settings() {
   return {
     soundMode,
     analysisResult: soundMode === "resynthesis" ? analysisResult : null,
-    waveform: selectedWaveform,
+    waveform: soundMode === "resynthesis" ? trackedWaveform.value : selectedWaveform,
     count: Number(countSelect.value) || 4,
     stack: stackSelect.value,
-    modulationMode: modulationSelect.value,
-    modulationRatio: Math.max(0.25, Math.min(8, Number(modulationRatioInput.value) || 1)),
-    multiplierText: "1:1.5:2:2.5",
+    modulationMode: currentModulation(),
+    modulationRatio: Math.max(0.25, Math.min(8, Number((soundMode === "resynthesis" ? trackedRatio : modulationRatioInput).value) || 1)),
+    multiplierText: soundMode === "resynthesis" ? trackedMultipliers.value : "1:1.5:2:2.5",
+    ...(soundMode === "resynthesis" ? {sourceLayout: trackedLayout.value} : {}),
     durationSeconds: Math.max(0, Math.min(MAX_SOUND_DURATION_SECONDS, Number(durationInput.value))),
     convolutionEnabled: soundMode === "convolution" && Boolean(impulseBuffer48k),
     convolutionWet: convolutionWetAmount,
@@ -815,7 +826,7 @@ function setActiveCurve(name) {
   selectedPoint = null;
   hoverPoint = null;
   Object.entries(modeButtons).forEach(([key, button]) => button.classList.toggle("active", key === name));
-  modulationCurveButton.classList.toggle("active", name === modulationCurves[modulationSelect.value]);
+  modulationCurveButton.classList.toggle("active", name === modulationCurves[currentModulation()]);
   draw();
 }
 
@@ -883,7 +894,7 @@ function drawFrequency() {
   const top = 26;
   frequencyCtx.font = "12px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
   frequencyCtx.fillStyle = "#e8f0f6";
-  const heading = soundMode === "resynthesis" ? "Current Analyzed Partials" : "Current Oscillator Values";
+  const heading = soundMode === "resynthesis" ? "Source Reference Partials" : "Current Oscillator Values";
   frequencyCtx.fillText(heading, 18, 20);
   frequencyCtx.fillStyle = "rgba(170, 188, 204, 0.78)";
   frequencyCtx.fillText(`${voices.length}/${soundMode === "resynthesis" ? analysisResult?.partialCount || 0 : countSelect.value} voices below Nyquist`, 30 + frequencyCtx.measureText(heading).width, 20);
@@ -914,7 +925,7 @@ function drawCurves() {
   ctx.fillStyle = "#191c20";
   ctx.fillRect(0, 0, canvasCssWidth, canvasCssHeight);
   drawGrid();
-  Object.keys(curves).filter((name) => !Object.values(modulationCurves).includes(name) || (soundMode !== "resynthesis" && name === modulationCurves[modulationSelect.value]))
+  Object.keys(curves).filter((name) => !Object.values(modulationCurves).includes(name) || name === modulationCurves[currentModulation()])
     .forEach((name) => drawCurve(name, name === activeCurve));
   drawPlayhead();
 }
@@ -1131,10 +1142,10 @@ function updateReadouts() {
   readouts.slope.textContent = `${slopeDbFromNorm(valueAt(curves.slope, t)).toFixed(1)} dB/oct`;
   readouts.voices.textContent = `${voices.length}/${soundMode === "resynthesis" ? analysisResult?.partialCount || 0 : countSelect.value} in range`;
   const mode = currentSettings.modulationMode;
-  if (soundMode !== "resynthesis" && mode !== "off") {
+  if (mode !== "off") {
     const carrier = voices[0]?.frequency;
     const ratio = currentSettings.modulationRatio;
-    modulationFrequencyInfo.textContent = carrier
+    modulationFrequencyInfo.textContent = soundMode === "resynthesis" ? `Each partial × ${ratio} · after frequency layout` : carrier
       ? `Voice 1: ${Math.round(carrier)} Hz carrier × ${ratio} = ${Math.round(carrier * ratio)} Hz modulator · each voice follows its own carrier`
       : "No oscillator below Nyquist at this point";
     const amount = modulationAmountAt(currentSettings, t);
@@ -1150,28 +1161,42 @@ function updateReadouts() {
 }
 
 Object.entries(modeButtons).forEach(([name, button]) => button.addEventListener("click", () => setActiveCurve(name)));
-modulationCurveButton.addEventListener("click", () => setActiveCurve(modulationCurves[modulationSelect.value]));
+modulationCurveButton.addEventListener("click", () => setActiveCurve(modulationCurves[currentModulation()]));
 
-modulationSelect.addEventListener("change", () => {
-  const enabled = modulationSelect.value !== "off";
+function syncModulationControls() {
+  const mode = currentModulation();
+  const enabled = mode !== "off";
   modulationRatioField.hidden = !enabled;
+  document.getElementById("trackedRatioField").hidden = !enabled;
+  document.getElementById("trackedMultipliersField").hidden = trackedLayout.value !== "multiplier";
   modulationInfo.hidden = !enabled;
   modulationCurveButton.hidden = !enabled;
   if (enabled) {
-    modulationCurveButton.textContent = curveLabels[modulationCurves[modulationSelect.value]];
-    modulationCurveButton.dataset.mode = modulationSelect.value;
+    modulationCurveButton.textContent = curveLabels[modulationCurves[mode]];
+    modulationCurveButton.dataset.mode = mode;
   }
-  if (Object.values(modulationCurves).includes(activeCurve)) {
-    setActiveCurve(enabled ? modulationCurves[modulationSelect.value] : "basePitch");
-  }
-  sendSettings();
-});
+}
 
-modulationRatioInput.addEventListener("change", () => {
-  modulationRatioInput.value = String(Math.max(0.25, Math.min(8, Number(modulationRatioInput.value) || 1)));
+for (const select of [modulationSelect, trackedModulation, trackedLayout]) {
+  select.addEventListener("change", () => {
+    syncModulationControls();
+    if (Object.values(modulationCurves).includes(activeCurve)) {
+      setActiveCurve(modulationCurves[currentModulation()] || "basePitch");
+    }
+    sendSettings();
+  });
+}
+for (const input of [modulationRatioInput, trackedRatio]) {
+  input.addEventListener("change", () => {
+    input.value = String(Math.max(.25, Math.min(8, Number(input.value) || 1)));
+    sendSettings();
+  });
+  input.addEventListener("input", sendSettings);
+}
+trackedMultipliers.addEventListener("change", () => {
+  trackedMultipliers.value = parseMultipliers(trackedMultipliers.value).join(":");
   sendSettings();
 });
-modulationRatioInput.addEventListener("input", sendSettings);
 
 function updateImpulseLengthLabel() {
   const percent = Number(impulseLengthInput.value);
@@ -1212,7 +1237,7 @@ function setSoundMode(nextMode) {
     curves = resynthesisState.curves;
     editedCurves = resynthesisState.editedCurves;
   }
-  if (nextMode === "resynthesis" && Object.values(modulationCurves).includes(activeCurve)) activeCurve = "basePitch";
+  if (Object.values(modulationCurves).includes(activeCurve)) activeCurve = modulationCurves[currentModulation()] || "basePitch";
   for (const [mode, button] of [["resynthesis", resynthesisModeButton], ["convolution", convolutionButton]]) {
     const active = mode === nextMode;
     button.classList.toggle("active", active);
@@ -1222,8 +1247,7 @@ function setSoundMode(nextMode) {
   resynthesisControls.hidden = nextMode !== "resynthesis";
   impulseStatus.hidden = nextMode !== "convolution";
   convolutionControls.hidden = nextMode !== "convolution" || !impulseBuffer48k;
-  modulationInfo.hidden = nextMode === "resynthesis" || modulationSelect.value === "off";
-  modulationCurveButton.hidden = nextMode === "resynthesis" || modulationSelect.value === "off";
+  syncModulationControls();
   openAudioButton.textContent = "Open Audio";
   readouts.safety.textContent = "auto gain / limiter";
   setActiveCurve(activeCurve);
@@ -1717,7 +1741,7 @@ const hubBufferCache=new WeakMap();const hubBuffer=b=>{if(!b)return null;if(!hub
 const hubAudio=p=>{if(!p)return null;const b=new AudioBuffer({sampleRate:p.sampleRate,numberOfChannels:p.channels.length,length:p.channels[0].length});p.channels.forEach((c,i)=>b.copyToChannel(c,i));return b;};
 const hubDOM=()=>Object.fromEntries([...document.querySelectorAll('input[id],select[id]')].filter(e=>e.type!=='file'&&!/scrub|seek|meter/i.test(e.id)).map(e=>[e.id,{value:e.value,checked:e.checked}]));
 function hubSnapshot(){return {curves:structuredClone(curves),activeCurve,tool:selectedTool,dom:hubDOM(),extra:structuredClone(({soundMode,selectedWaveform,impulseRevision,analysisGeneration,appliedImpulsePercent,editedCurves:structuredClone(editedCurves),resynthesisState:structuredClone(resynthesisState),oscillatorState:structuredClone(oscillatorState),analysisResult:structuredClone(analysisResult),impulse:hubBuffer(impulseBuffer48k),impulseFileName,impulseBytes,source48k:hubBuffer(impulseSource48k),sourceNative:hubBuffer(impulseSourceNative)}))};}
-function hubRestore(s){if(!s)return;hubQuiet++;try{for(const [id,v]of Object.entries(s.dom||{})){const e=document.getElementById(id);if(e){e.value=v.value;e.checked=v.checked;}}resynthesisState=structuredClone(s.extra.resynthesisState);Object.assign(oscillatorState,structuredClone(s.extra.oscillatorState));setSoundMode(s.extra.soundMode);const modeState=s.extra.soundMode==='resynthesis'?resynthesisState:oscillatorState;curves=modeState.curves;editedCurves=modeState.editedCurves;Object.assign(editedCurves,structuredClone(s.extra.editedCurves));selectedWaveform=s.extra.selectedWaveform;waveformButtons.forEach(b=>{b.classList.toggle('active',b.dataset.waveform===selectedWaveform);b.setAttribute('aria-pressed',String(b.dataset.waveform===selectedWaveform));});analysisResult=structuredClone(s.extra.analysisResult);impulseBuffer48k=hubAudio(s.extra.impulse);impulseBytes=s.extra.impulseBytes;impulseSource48k=hubAudio(s.extra.source48k);impulseSourceNative=hubAudio(s.extra.sourceNative);impulseFileName=s.extra.impulseFileName;appliedImpulsePercent=s.extra.appliedImpulsePercent;convolutionWetValue.value=convolutionWet.value+'%';updateImpulseLengthLabel();impulseStatus.textContent=impulseBuffer48k?impulseFileName+' · IR '+impulseBuffer48k.duration.toFixed(2)+' s':'No IR loaded · dry oscillator';convolutionControls.hidden=soundMode!=='convolution'||!impulseBuffer48k;for(const [k,v]of Object.entries(s.curves))curves[k]=structuredClone(v);setTool(s.tool||'pen');setActiveCurve(s.activeCurve);sendSettings();updateTransport();resizeCanvas();draw();}finally{hubQuiet--;}}
+function hubRestore(s){if(!s)return;hubQuiet++;try{trackedWaveform.value="sine";trackedLayout.value="source";trackedModulation.value="off";trackedRatio.value="1";trackedMultipliers.value="1:1.5:2:2.5";for(const [id,v]of Object.entries(s.dom||{})){const e=document.getElementById(id);if(e){e.value=v.value;e.checked=v.checked;}}resynthesisState=structuredClone(s.extra.resynthesisState);Object.assign(oscillatorState,structuredClone(s.extra.oscillatorState));setSoundMode(s.extra.soundMode);const modeState=s.extra.soundMode==='resynthesis'?resynthesisState:oscillatorState;curves=modeState.curves;editedCurves=modeState.editedCurves;Object.assign(editedCurves,structuredClone(s.extra.editedCurves));selectedWaveform=s.extra.selectedWaveform;waveformButtons.forEach(b=>{b.classList.toggle('active',b.dataset.waveform===selectedWaveform);b.setAttribute('aria-pressed',String(b.dataset.waveform===selectedWaveform));});analysisResult=structuredClone(s.extra.analysisResult);impulseBuffer48k=hubAudio(s.extra.impulse);impulseBytes=s.extra.impulseBytes;impulseSource48k=hubAudio(s.extra.source48k);impulseSourceNative=hubAudio(s.extra.sourceNative);impulseFileName=s.extra.impulseFileName;appliedImpulsePercent=s.extra.appliedImpulsePercent;convolutionWetValue.value=convolutionWet.value+'%';updateImpulseLengthLabel();impulseStatus.textContent=impulseBuffer48k?impulseFileName+' · IR '+impulseBuffer48k.duration.toFixed(2)+' s':'No IR loaded · dry oscillator';convolutionControls.hidden=soundMode!=='convolution'||!impulseBuffer48k;for(const [k,v]of Object.entries(s.curves))curves[k]=structuredClone(v);syncModulationControls();setTool(s.tool||'pen');setActiveCurve(s.activeCurve);sendSettings();updateTransport();resizeCanvas();draw();}finally{hubQuiet--;}}
 const hubDefault=hubSnapshot();
 window.hubBridge={
  displayTime:seconds=>{playheadSeconds=Math.min(seconds,settings().durationSeconds);draw();},
@@ -1816,7 +1840,7 @@ window.hubBridge.restore=s=>{
  hubLevelRestore(s);hubApplyLevel();
 };
 const hubLevelSpec=window.hubBridge.spec;
-window.hubBridge.spec=()=>({...hubLevelSpec(),hubLevelPolicy:'input-rms-v1',hubOutputGain:hubLevelRecord(soundMode)?.gain??null});
+window.hubBridge.spec=()=>soundMode==='resynthesis' ? hubLevelSpec() : {...hubLevelSpec(),hubLevelPolicy:'input-rms-v1',hubOutputGain:hubLevelRecord(soundMode)?.gain??null};
 const hubLevelBusy=window.hubBridge.busy;
 window.hubBridge.busy=()=>Boolean(hubLevelTask)||hubLevelBusy();
 window.hubBridge.prepareOutput=()=>hubPrepareLevel();

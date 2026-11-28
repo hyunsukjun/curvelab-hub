@@ -23,7 +23,7 @@ export default {
   "tab.space": "Bewegen Sie den Klang im Raum und gestalten Sie Distanz und Hall.",
   "tab.granular": "Erzeugen Sie Klang aus kurzen Grains des Quellaudios.",
   "tab.spectral": "Verändern Sie den Frequenzinhalt des Quellaudios.",
-  "tab.oscillator": "Resynthetisieren Sie eine Datei oder erzeugen Sie Oszillatorklang mit optionaler Impulsantwort aus einer Datei.",
+  "tab.oscillator": "Rekonstruiert das Audiomaterial aus seinen zeitlich veränderlichen Teiltönen.",
   "tab.handoff": "Beim Lab-Wechsel wird nur nach einer Änderung der Verarbeitung eine neue Stufe gespeichert.",
   "lab.clearCurrent": "Setzt die ausgewählte Kurve auf ihre Standardwerte zurück.",
   "audio.resetButton": "Stellt die Standardkurven für Geschwindigkeit, Tonhöhe und Panorama wieder her.",
@@ -207,7 +207,7 @@ export default {
   "oscillator.stackSelect": "Wählen Sie die Anordnung der Oszillatorfrequenzen relativ zur Grundfrequenz.",
   "oscillator.modulationSelect": "Wählen Sie FM, AM oder Ringmodulation, oder schalten Sie die Modulation aus.",
   "oscillator.modulationRatioInput": "Stellen Sie die Modulatorfrequenz als Vielfaches der jeweiligen Oszillatorfrequenz ein.",
-  "oscillator.partialCountSelect": "Wählen Sie bis zu 32 oder 64 Teiltöne für die Resynthese.",
+  "oscillator.partialCountSelect": "Wählen Sie bis zu 16, 32, 64 oder 128 Teiltöne für die Resynthese.",
   "oscillator.convolutionWet": "Mischen Sie den direkten Oszillatorklang mit dem durch die Impulsantwort bearbeiteten Klang.",
   "oscillator.impulseLength": "Legt fest, wie viel von der Impulsantwort verwendet wird. Dateien unter 3 s werden vollständig genutzt.",
   "oscillator.basePitchModeHelp": [

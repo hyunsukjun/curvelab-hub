@@ -23,7 +23,7 @@ export default {
   "tab.space": "Sposta il suono nello spazio e modella distanza e riverbero.",
   "tab.granular": "Crea un suono a partire da brevi grani dell’audio sorgente.",
   "tab.spectral": "Trasforma il contenuto in frequenza dell’audio sorgente.",
-  "tab.oscillator": "Risintetizza un file o genera un suono con oscillatori, con risposta all’impulso facoltativa.",
+  "tab.oscillator": "Ricostruisce il suono seguendo l’evoluzione delle sue parziali.",
   "tab.handoff": "Quando cambi Lab, viene salvato un nuovo passaggio se l’elaborazione è cambiata.",
   "lab.clearCurrent": "Ripristina i valori predefiniti della curva selezionata.",
   "audio.resetButton": "Ripristina le curve predefinite di velocità, intonazione e panoramica.",
@@ -207,7 +207,7 @@ export default {
   "oscillator.stackSelect": "Scegli come disporre le frequenze degli oscillatori rispetto alla frequenza di base.",
   "oscillator.modulationSelect": "Scegli FM, AM o modulazione ad anello, oppure disattiva la modulazione.",
   "oscillator.modulationRatioInput": "Imposta la frequenza del modulatore come multiplo di quella di ciascun oscillatore.",
-  "oscillator.partialCountSelect": "Scegli fino a 32 o 64 parziali per la risintesi.",
+  "oscillator.partialCountSelect": "Scegli fino a 16, 32, 64 o 128 parziali per la risintesi.",
   "oscillator.convolutionWet": "Bilancia il suono diretto degli oscillatori e quello elaborato dalla risposta all’impulso.",
   "oscillator.impulseLength": "Imposta la porzione di risposta all’impulso da usare. I file di durata inferiore a 3 s sono usati per intero.",
   "oscillator.basePitchModeHelp": [

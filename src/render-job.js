@@ -10,9 +10,11 @@ export function oscillatorImpulse({sampleRate,channels}){
  return buffer;
 }
 const oscillatorRender=()=>import('../labs/oscillator/src/offline-render.js?v=hub-ir-phases1');
-export async function synthesizeIRSource(settings,impulseLength,onProgress){
+export async function synthesizeIRSource(input,settings,impulseLength,options){
  const {synthesizeOscillatorBody}=await oscillatorRender();
- return {channels:await synthesizeOscillatorBody({settings,impulseLength,onProgress,cooperative:false})};
+ const {createIRSourceFollower}=await import('./ir-source-follower.js');
+ const createFollower=frames=>createIRSourceFollower(input,settings,frames);
+ return {channels:await synthesizeOscillatorBody({settings,createFollower,impulseLength,...options})};
 }
 export async function finishIRPacket(channels,spec,onProgress){
  const {finishOscillatorOutput}=await oscillatorRender();
@@ -49,10 +51,22 @@ export async function processPacket(lab,p,spec,{signal,onProgress,reference=fals
   const m=await import(`../labs/spectral/src/${reference?'reference-':''}offline-render.js`);
   out=await m.renderOffline({audioBuffer:audio,...spec,signal,onProgress});
  }else if(lab==='oscillator'){
-  const m=reference?await import('../labs/oscillator/src/reference-offline-render.js')
-   :await oscillatorRender();
+  if(spec.settings.soundMode==='resynthesis'){
+   const {trackedResynthesis}=await import('./tracked-resynthesis.js');
+   const {finishOscillatorOutput}=await oscillatorRender();
+   const channels=await trackedResynthesis(p,spec.settings,{signal,onProgress,cooperative});
+   out=await finishOscillatorOutput({channels,signal,onProgress,cooperative,pcmOnly:!reference});
+   return reference?out:outputPacket(out);
+  }
+  const {finishOscillatorOutput}=await oscillatorRender();
   const impulse=needsOfflineConvolution(spec)?oscillatorImpulse(spec.impulse):null;
-  out=await m.renderOscillator({settings:spec.settings,impulse,signal,onProgress,pcmOnly:!reference,cooperative});
+  const body=await synthesizeIRSource(p,spec.settings,impulse?.length??0,{signal,onProgress,cooperative});
+  let channels=body.channels;
+  if(impulse){
+   const {renderConvolved}=await import('../labs/oscillator/src/convolution.js');
+   channels=await renderConvolved(channels,48000,impulse,spec.settings.convolutionWet,signal);
+  }
+  out=await finishOscillatorOutput({channels,signal,onProgress,pcmOnly:!reference,cooperative});
   return reference?out:oscillatorPacket(out,spec);
  }else throw new Error('Unknown Lab');
  return reference?out:outputPacket(out);

@@ -23,7 +23,7 @@ export default {
   "tab.space": "Move o som no espaço e ajusta a distância e a reverberação.",
   "tab.granular": "Cria som a partir de grãos curtos do áudio de origem.",
   "tab.spectral": "Transforma o conteúdo de frequências do áudio de origem.",
-  "tab.oscillator": "Ressintetiza um arquivo ou gera som com osciladores e uma resposta a impulso opcional.",
+  "tab.oscillator": "Reconstrói o áudio a partir da evolução dos seus parciais.",
   "tab.handoff": "Ao trocar de Lab, uma nova etapa é salva se o processamento tiver mudado.",
   "lab.clearCurrent": "Restaura os valores padrão da curva selecionada.",
   "audio.resetButton": "Restaura as curvas padrão de velocidade, tom e panorama.",
@@ -207,7 +207,7 @@ export default {
   "oscillator.stackSelect": "Escolhe como as frequências dos osciladores se distribuem em relação à frequência base.",
   "oscillator.modulationSelect": "Escolhe FM, AM ou modulação em anel, ou desativa a modulação.",
   "oscillator.modulationRatioInput": "Define a frequência do modulador como múltiplo da frequência de cada oscilador.",
-  "oscillator.partialCountSelect": "Escolhe um máximo de 32 ou 64 parciais para a ressíntese.",
+  "oscillator.partialCountSelect": "Escolhe um máximo de 16, 32, 64 ou 128 parciais para a ressíntese.",
   "oscillator.convolutionWet": "Mistura o som direto dos osciladores com o som processado pela resposta a impulso.",
   "oscillator.impulseLength": "Ajusta quanto da resposta a impulso é usado. Arquivos com menos de 3 s são usados por inteiro.",
   "oscillator.basePitchModeHelp": [

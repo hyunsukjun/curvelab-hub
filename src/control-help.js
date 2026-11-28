@@ -23,7 +23,7 @@ const labTabTooltipCopy = {
   space: 'Move sound in space and shape distance and reverb.',
   granular: 'Build sound from short grains of the source audio.',
   spectral: 'Transform the frequency content of the source audio.',
-  oscillator: 'Resynthesize a file or generate oscillator sound with optional file IR.',
+  oscillator: 'Rebuild the working audio from its changing partials.',
 };
 
 const hubControlCopy = {

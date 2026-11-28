@@ -1,3 +1,4 @@
+import {MAX_VOICES} from './voice-counts.js';
 export const TARGET_SAMPLE_RATE = 48000;
 export const MAX_SOUND_DURATION_SECONDS = 600;
 export const MIN_BASE_FREQUENCY = 20;
@@ -75,6 +76,24 @@ export function parseMultipliers(text) {
     .map((part) => Number(part.trim()))
     .filter((value) => Number.isFinite(value) && value > 0);
   return values.length ? values.slice(0, 16) : [1, 1.5, 2, 2.5];
+}
+
+// Remap a measured partial relative to the analysis reference, retaining its
+// amplitude and timing. Multipliers repeat by octave to cover the source range.
+export function sourceLayoutRatio(ratio, layout, multipliers) {
+  if (layout === 'harmonic') return Math.max(1, Math.round(ratio));
+  if (layout === 'odd') return 1 + 2 * Math.max(0, Math.round((ratio - 1) / 2));
+  if (layout !== 'multiplier' || ratio <= 0) return ratio;
+  let nearest = ratio, distance = Infinity;
+  for (const multiple of multipliers) {
+    const octave = Math.log2(ratio / multiple);
+    const shift = Math.round(octave);
+    if (Math.abs(octave - shift) < distance) {
+      nearest = multiple * 2 ** shift;
+      distance = Math.abs(octave - shift);
+    }
+  }
+  return nearest;
 }
 
 export function stackFrequencies(settings, t, sampleRate = TARGET_SAMPLE_RATE, deviationOverride = null, prepared = null) {
@@ -262,10 +281,10 @@ export function* encodeWav24Steps(channels, sampleRate) {
 
 function clampCount(value) {
   const count = Number(value) || 4;
-  return [1, 2, 4, 8, 16].includes(count) ? count : 4;
+  return [1, 2, 4, 8, 16, 32, 64, MAX_VOICES].includes(count) ? count : 4;
 }
 
-function harmonicBend(index) {
+export function harmonicBend(index) {
   return Math.sin((index + 1) * 1.618) * 0.5;
 }
 
@@ -344,7 +363,7 @@ function writeString(view, offset, value) {
   }
 }
 
-export function renderFrame(settings, t, sampleRate, phases, modPhases, smoothingState = null, prepared = null) {
+export function renderFrame(settings, t, sampleRate, phases, modPhases, smoothingState = null, prepared = null, balance = null) {
   if (smoothingState && smoothingState.stack !== settings.stack) {
     smoothingState.deviation = null;
     smoothingState.stack = settings.stack;
@@ -367,9 +386,11 @@ export function renderFrame(settings, t, sampleRate, phases, modPhases, smoothin
   for (const voice of voices) {
     const phase = (phases[voice.index] + voice.phaseOffset) % 1;
     const modPhase = (modPhases[voice.index] + voice.phaseOffset) % 1;
+    const weight = balance ? balance.current[voice.index]
+      + balance.fraction * (balance.next[voice.index] - balance.current[voice.index]) : 1;
     const sample = modulatedOscillatorSample(
       settings.waveform, phase, modPhase, mode, amount, voice.frequency, ratio, sampleRate
-    ) * voice.amplitude;
+    ) * (voice.amplitude * weight);
     const gains = voice.gains?.[voices.length];
     const angle = gains ? 0 : (voicePan(voice.index, voices.length, settings.stack || "unison") + 1) * Math.PI * 0.25;
     left += sample * (gains ? gains[0] : Math.cos(angle));
@@ -392,8 +413,9 @@ export function resynthesisVoices(settings, t, sampleRate = TARGET_SAMPLE_RATE) 
   const deviation = partialDeviationFromNorm(deviationAmountFromCurveY(valueAt(settings.curves?.deviation, t)));
   const slopeDb = slopeDbFromNorm(valueAt(settings.curves?.slope, t));
   const voices = [];
+  const multipliers = settings.sourceLayout === 'multiplier' ? parseMultipliers(settings.multiplierText) : null;
   for (const partial of result.partials) {
-    const ratio = partial.frequency / reference;
+    const ratio = sourceLayoutRatio(partial.frequency / reference, settings.sourceLayout, multipliers);
     const bend = deviation * harmonicBend(partial.index - 1);
     const frequency = base * Math.max(0.125, ratio + bend);
     const nyquistGain = resynthesisNyquistGain(frequency, sampleRate);

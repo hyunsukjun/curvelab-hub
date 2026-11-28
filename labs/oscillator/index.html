@@ -60,10 +60,10 @@
       </header>
 
       <section class="editor">
-        <div class="sourceBand" title="Choose a synthesis path. File IR processes the oscillator sound.">
+        <div class="sourceBand">
           <div class="soundModes" role="group" aria-label="Sound generation mode">
             <button id="resynthesisMode" class="active" type="button" aria-pressed="true">File Resynthesis</button>
-            <button id="convolutionButton" type="button" aria-pressed="false">Oscillator + File IR</button>
+            <button id="convolutionButton" hidden type="button" aria-pressed="false">Oscillator + File IR</button>
           </div>
 
           <div class="curveActions">
@@ -83,11 +83,14 @@
           <label class="compactField countField">
             Oscillators
             <select id="countSelect">
-              <option value="1">1</option>
-              <option value="2">2</option>
+              <option value="1" hidden>1</option>
+              <option value="2" hidden>2</option>
               <option value="4" selected>4</option>
               <option value="8">8</option>
               <option value="16">16</option>
+              <option value="32">32</option>
+              <option value="64">64</option>
+              <option value="128">128</option>
             </select>
           </label>
           <label class="compactField stackField">
@@ -117,8 +120,27 @@
           </div>
           <div id="resynthesisControls" class="resynthesisControls">
             <span id="resynthesisSource" class="impulseStatus" role="status">No sound file loaded</span>
+            <label class="compactField">Waveform
+              <select id="trackedWaveform" aria-label="File Resynthesis waveform"><option value="sine">Sine</option><option value="triangle">Triangle</option><option value="saw">Saw</option><option value="square">Square</option></select>
+            </label>
+            <label class="compactField">Frequency layout
+              <select id="trackedLayout">
+                <option value="source">Follow Source</option><option value="harmonic">Harmonic</option>
+                <option value="odd">Odd Harmonics</option><option value="multiplier">Multiplier</option>
+              </select>
+            </label>
+            <label id="trackedMultipliersField" class="compactField" hidden>Ratios
+              <input id="trackedMultipliers" type="text" size="13" value="1:1.5:2:2.5" title="Positive ratios separated by colons, repeated by octave">
+            </label>
+            <label class="compactField">Modulation
+              <select id="trackedModulation"><option value="off">Off</option><option value="am">AM</option>
+                <option value="fm">FM</option><option value="ring">Ring</option></select>
+            </label>
+            <label id="trackedRatioField" class="compactField ratioField" hidden>Mod Freq ×
+              <input id="trackedRatio" type="number" min="0.25" max="8" step="0.25" value="1" inputmode="decimal">
+            </label>
             <label class="compactField resynthesisCount">Partials
-              <select id="partialCountSelect"><option value="32">32</option><option value="64">64</option></select>
+              <select id="partialCountSelect"><option value="16">16</option><option value="32" selected>32</option><option value="64">64</option><option value="128">128</option></select>
             </label>
             <span id="analysisStatus" role="status">Loading default sample…</span>
           </div>

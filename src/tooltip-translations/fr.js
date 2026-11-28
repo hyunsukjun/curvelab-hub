@@ -23,7 +23,7 @@ export default {
   "tab.space": "Déplacez le son dans l’espace et ajustez la distance et la réverbération.",
   "tab.granular": "Créez un son à partir de courts grains du signal source.",
   "tab.spectral": "Transformez le contenu fréquentiel du signal source.",
-  "tab.oscillator": "Resynthétisez un fichier ou générez un son d’oscillateur avec une réponse impulsionnelle facultative.",
+  "tab.oscillator": "Reconstruit le son à partir de l’évolution de ses partiels.",
   "tab.handoff": "Le changement de Lab enregistre une étape si le traitement a été modifié.",
   "lab.clearCurrent": "Rétablissez les valeurs par défaut de la courbe sélectionnée.",
   "audio.resetButton": "Rétablissez les courbes par défaut de vitesse, de hauteur et de panoramique.",
@@ -207,7 +207,7 @@ export default {
   "oscillator.stackSelect": "Choisissez comment répartir les fréquences des oscillateurs par rapport à la fréquence de base.",
   "oscillator.modulationSelect": "Choisissez la FM, l’AM ou la modulation en anneau, ou désactivez la modulation.",
   "oscillator.modulationRatioInput": "Réglez la fréquence du modulateur comme multiple de celle de chaque oscillateur.",
-  "oscillator.partialCountSelect": "Choisissez jusqu’à 32 ou 64 partiels pour la resynthèse.",
+  "oscillator.partialCountSelect": "Choisissez jusqu’à 16, 32, 64 ou 128 partiels pour la resynthèse.",
   "oscillator.convolutionWet": "Dosez le son direct des oscillateurs et le son traité par la réponse impulsionnelle.",
   "oscillator.impulseLength": "Réglez la portion de réponse impulsionnelle utilisée. Les fichiers de moins de 3 s sont utilisés en entier.",
   "oscillator.basePitchModeHelp": [

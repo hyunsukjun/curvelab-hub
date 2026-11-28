@@ -1,3 +1,4 @@
+import {MAX_VOICES} from './voice-counts.js';
 import {irSourceReleaseGain} from "./ir-source-boundary.js?v=20261030-ir-end1";
 import { fadeOutput } from "./playback-boundary.js";
 import { renderFrame, prepareResynthesisRender, prepareStackRender, createSmoothingState, TARGET_SAMPLE_RATE, MAX_SOUND_DURATION_SECONDS, clamp, encodeWav24Steps, outputChannelCount } from "./oscillator-core.js?v=hub-long-output1";
@@ -15,7 +16,7 @@ async function yieldUI(signal) {
 
 // The caller owns a settings snapshot. The worker needs only the IR length
 // here to apply the same release to the body before native convolution.
-export async function synthesizeOscillatorBody({ settings, impulseLength = 0, signal, onProgress, cooperative = true }) {
+export async function synthesizeOscillatorBody({ settings, createFollower = null, impulseLength = 0, signal, onProgress, cooperative = true }) {
   checkAbort(signal);
   const sampleRate = TARGET_SAMPLE_RATE;
   const requestedDuration = Number(settings.durationSeconds ?? 20);
@@ -25,8 +26,8 @@ export async function synthesizeOscillatorBody({ settings, impulseLength = 0, si
   const frameCount = Math.ceil(durationFrames);
   const channelCount = outputChannelCount(settings.format);
   const output = Array.from({ length: channelCount }, () => new Float32Array(frameCount));
-  const phases = new Float64Array(64);
-  const modPhases = new Float64Array(64);
+  const phases = new Float64Array(MAX_VOICES);
+  const modPhases = new Float64Array(MAX_VOICES);
   const smoothingState = createSmoothingState();
   const prepared = prepareResynthesisRender(settings) ?? prepareStackRender(settings);
   const convolving = impulseLength > 0 && settings.convolutionEnabled && settings.convolutionWet > 0;
@@ -34,12 +35,17 @@ export async function synthesizeOscillatorBody({ settings, impulseLength = 0, si
   let lastProgress = 0;
   let lastYield = performance.now();
 
-  for (let frame = 0; frame < frameCount; frame += 1) {
+  const sourceFollower = createFollower?.(frameCount);
+  const activeFrames = sourceFollower?.length ?? frameCount;
+  for (let frame = 0; frame < activeFrames; frame += 1) {
     const t = frame / durationFrames;
-    const sample = renderFrame(settings, t, sampleRate, phases, modPhases, smoothingState, prepared);
+    const level = sourceFollower ? sourceFollower.update(frame) : 1;
+    const sample = renderFrame(settings, t, sampleRate, phases, modPhases, smoothingState, prepared, sourceFollower);
     const fade = convolving ? irSourceReleaseGain(frame, frameCount, impulseLength - 1, sampleRate) : 1;
-    const left = sample.left * fade;
-    const right = sample.right * fade;
+    const sourceEdge = activeFrames < frameCount ? Math.min(1, (activeFrames - 1 - frame) / (sampleRate * .01)) : 1;
+    const gain = level * sourceEdge * fade;
+    const left = sample.left * gain;
+    const right = sample.right * gain;
     output[0][frame] = left;
     if (channelCount > 1) output[1][frame] = right;
 

@@ -3,7 +3,7 @@ self.onmessage=async({data})=>{
  const onProgress=progress=>postMessage({progress});
  try{
   let packet;
-  if(data.phase==='ir-source')packet=await synthesizeIRSource(data.settings,data.impulseLength,onProgress);
+  if(data.phase==='ir-source')packet=await synthesizeIRSource(data.packet,data.settings,data.impulseLength,{onProgress,cooperative:false});
   else if(data.phase==='ir-output')packet=await finishIRPacket(data.channels,data.spec,onProgress);
   else packet=await processPacket(data.lab,data.packet,data.spec,{cooperative:false,onProgress});
   postMessage({packet},packet.channels.map(channel=>channel.buffer));

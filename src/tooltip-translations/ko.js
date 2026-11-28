@@ -23,7 +23,7 @@ export default {
   "tab.space": "공간에서 소리를 움직이고 거리와 잔향을 조절합니다.",
   "tab.granular": "소스 음원을 짧은 그레인으로 나눠 소리를 만듭니다.",
   "tab.spectral": "소스 음원의 주파수 성분을 변형합니다.",
-  "tab.oscillator": "파일을 재합성하거나 오실레이터로 소리를 만듭니다. 필요하면 파일을 임펄스 응답으로 사용합니다.",
+  "tab.oscillator": "시간에 따라 변하는 부분음을 이용해 작업 중인 음원을 재합성합니다.",
   "tab.handoff": "처리 설정을 바꾼 뒤 다른 랩을 선택하면 새 단계가 저장됩니다.",
   "lab.clearCurrent": "선택한 커브를 기본값으로 되돌립니다.",
   "audio.resetButton": "속도, 음높이, 팬 커브를 기본값으로 되돌립니다.",
@@ -207,7 +207,7 @@ export default {
   "oscillator.stackSelect": "기준 주파수에 대한 오실레이터 주파수 배열을 선택합니다.",
   "oscillator.modulationSelect": "FM, AM, 링 변조 중 하나를 선택하거나 변조를 끕니다.",
   "oscillator.modulationRatioInput": "각 오실레이터 주파수의 몇 배로 변조할지 정합니다.",
-  "oscillator.partialCountSelect": "재합성에 사용할 부분음 수의 상한을 32개 또는 64개로 정합니다.",
+  "oscillator.partialCountSelect": "재합성에 사용할 부분음 수의 상한을 16·32·64·128개로 정합니다.",
   "oscillator.convolutionWet": "오실레이터 원음과 임펄스 응답으로 처리한 소리를 섞습니다.",
   "oscillator.impulseLength": "사용할 임펄스 응답 길이를 정합니다. 3초 미만 파일은 전체를 사용합니다.",
   "oscillator.basePitchModeHelp": [

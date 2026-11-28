@@ -1,3 +1,4 @@
+import {MAX_VOICES} from './voice-counts.js';
 import {irSourceReleaseGain} from "./ir-source-boundary.js?v=20261030-ir-end1";
 import {clamp, createSmoothingState, renderFrame, resetSmoothingState} from "./oscillator-core.js?v=20261026-harmonic-pan8";
 import {LOOKAHEAD_SECONDS} from "./safety-limiter.js?v=20261002-lookahead1";
@@ -12,8 +13,8 @@ class OscillatorCurveProcessor extends AudioWorkletProcessor {
     this.playing = false;
     this.outputTime = 0;
     this.token = 0;
-    this.phases = new Float64Array(64);
-    this.modPhases = new Float64Array(64);
+    this.phases = new Float64Array(MAX_VOICES);
+    this.modPhases = new Float64Array(MAX_VOICES);
     this.smoothingState = createSmoothingState();
     this.framesUntilUpdate = 0;
     this.transitionFrames = Math.max(2, Math.round(sampleRate * BOUNDARY_SECONDS));

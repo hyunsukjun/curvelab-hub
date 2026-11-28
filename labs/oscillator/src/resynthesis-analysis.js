@@ -1,3 +1,4 @@
+import {partialLimit} from './voice-counts.js';
 import { FFT } from './fft.js';
 
 export const ANALYSIS_FFT_SIZE = 8192;
@@ -7,7 +8,7 @@ export const ANALYSIS_MIN_BAND_AMPLITUDE = 1e-6;
 
 export function analyzeSpectrum(samples, sampleRate, requestedPartials = 32, source = {}) {
   if (!samples?.length || !Number.isFinite(sampleRate) || sampleRate <= 0) throw new Error('No decoded audio to analyze');
-  const count = requestedPartials === 64 ? 64 : 32;
+  const count = partialLimit(requestedPartials);
   const size = ANALYSIS_FFT_SIZE;
   const fft = new FFT(size);
   const real = new Float64Array(size);

@@ -37,7 +37,7 @@ export const labTooltipCopy = {
     '#stackSelect': 'Choose how oscillator frequencies are arranged relative to the base frequency.',
     '#modulationSelect': 'Choose FM, AM, or ring modulation, or turn modulation off.',
     '#modulationRatioInput': 'Set the modulator frequency as a multiple of each oscillator frequency.',
-    '#partialCountSelect': 'Choose up to 32 or 64 partials for resynthesis.',
+    '#partialCountSelect': 'Choose up to 16, 32, 64 or 128 partials for resynthesis.',
     '#convolutionWet': 'Blend the dry oscillator sound with the sound processed by the impulse response.',
     '#impulseLength': 'Set how much of the impulse response is used. Files under 3 seconds are used in full.',
   },
